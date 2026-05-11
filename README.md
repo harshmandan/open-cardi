@@ -1,13 +1,17 @@
-# open-cardi
+<div align="center">
 
-A [Web Bluetooth](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) replacement for the **Cardi Tech** Android app — controls Cardi K3 / K4 Active Ultra (and other ConSmart-family) RGB ambient lighting kits from any Chromium browser.
+  <img src="./static/favicon.png" alt="open-cardi" width="300" />
 
-→ **[opencardi.vercel.app](https://opencardi.vercel.app)**
-→ Writeup: [Reverse-engineering the Cardi Tech BLE protocol](https://harsh.ink/blog/reverse-engineering-cardi-tech)
+  <h1>open-cardi</h1>
 
-## Replaces
+</div>
 
-Official Android app: **Cardi Tech** ([`com.qc.xq`](https://play.google.com/store/apps/details?id=com.qc.xq) on Google Play) by Guangzhou Cardi Auto Parts. open-cardi reverse-engineers the same BLE protocol and runs in any Chromium browser — no Android, no ads, no tracking.
+A beautiful web-app replacement for the **Cardi Tech** ([`com.qc.xq`](https://play.google.com/store/apps/details?id=com.qc.xq) Android app — controls Cardi K3 / K4 Active Ultra (and other ConSmart-family) RGB ambient lighting kits from any Chromium browser. open-cardi reverse-engineers the same BLE protocol and runs in any Chromium browser — no Android, no ads, no tracking.
+
+<img src="./static/preview.png" alt="app-preview" width="600" />
+
+- Website: **[opencardi.vercel.app](https://opencardi.vercel.app)**
+- Writeup: [Reverse-engineering the Cardi Tech BLE protocol](https://harsh.ink/blog/reverse-engineering-cardi-tech)
 
 ## How it works
 
