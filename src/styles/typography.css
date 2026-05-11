@@ -1,0 +1,44 @@
+@theme {
+  /* To use different default fonts */
+  /* --font-sans: var(--font-geist-sans); */
+  /* --font-mono: var(--font-geist-mono); */
+
+  --text-*: initial;
+
+  /* Font weights. Remove this if you prefer to use font nomenclature like bold, medium, light, etc. */
+  --font-weight-*: initial;
+  --font-weight-400: 400;
+  --font-weight-500: 500;
+  --font-weight-600: 600;
+  --font-weight-700: 700;
+  --font-weight-800: 800;
+  --font-weight-900: 900;
+
+  /* Font sizes. By default these are mapped to the default tailwind styles (text-12 == text-xs). */
+  --text-12: calc(var(--spacing-scale) * 12);
+  --text-12--line-height: calc(1 / 0.75);
+  --text-14: calc(var(--spacing-scale) * 14);
+  --text-14--line-height: calc(1.25 / 0.875);
+  --text-base: calc(var(--spacing-scale) * 16);
+  --text-base--line-height: calc(1.5 / 1);
+  --text-18: calc(var(--spacing-scale) * 18);
+  --text-18--line-height: calc(1.75 / 1.125);
+  --text-20: calc(var(--spacing-scale) * 20);
+  --text-20--line-height: calc(1.75 / 1.25);
+  --text-24: calc(var(--spacing-scale) * 24);
+  --text-24--line-height: calc(2 / 1.5);
+  --text-30: calc(var(--spacing-scale) * 30);
+  --text-30--line-height: calc(2.25 / 1.875);
+  --text-36: calc(var(--spacing-scale) * 36);
+  --text-36--line-height: calc(2.5 / 2.25);
+  --text-48: calc(var(--spacing-scale) * 48);
+  --text-48--line-height: 1;
+  --text-60: calc(var(--spacing-scale) * 60);
+  --text-60--line-height: 1;
+  --text-72: calc(var(--spacing-scale) * 72);
+  --text-72--line-height: 1;
+  --text-96: calc(var(--spacing-scale) * 96);
+  --text-96--line-height: 1;
+  --text-128: calc(var(--spacing-scale) * 128);
+  --text-128--line-height: 1;
+}

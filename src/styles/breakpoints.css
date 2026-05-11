@@ -1,0 +1,25 @@
+@theme {
+  --breakpoint-initial: *;
+
+  --breakpoint-640: calc(var(--spacing-scale) * 640);
+  --breakpoint-768: calc(var(--spacing-scale) * 768);
+  --breakpoint-1024: calc(var(--spacing-scale) * 1024);
+  --breakpoint-1280: calc(var(--spacing-scale) * 1280);
+  --breakpoint-1536: calc(var(--spacing-scale) * 1536);
+
+  --container-initial: *;
+
+  --container-256: calc(var(--spacing-scale) * 256);
+  --container-288: calc(var(--spacing-scale) * 288);
+  --container-320: calc(var(--spacing-scale) * 320);
+  --container-384: calc(var(--spacing-scale) * 384);
+  --container-448: calc(var(--spacing-scale) * 448);
+  --container-512: calc(var(--spacing-scale) * 512);
+  --container-576: calc(var(--spacing-scale) * 576);
+  --container-640: calc(var(--spacing-scale) * 640);
+  --container-768: calc(var(--spacing-scale) * 768);
+  --container-896: calc(var(--spacing-scale) * 896);
+  --container-1024: calc(var(--spacing-scale) * 1024);
+  --container-1152: calc(var(--spacing-scale) * 1152);
+  --container-1280: calc(var(--spacing-scale) * 1280);
+}

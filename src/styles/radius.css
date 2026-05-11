@@ -1,0 +1,10 @@
+@theme {
+  --radius-*: initial;
+  --radius-2: calc(var(--spacing-scale) * 2);
+  --radius-4: calc(var(--spacing-scale) * 4);
+  --radius-8: calc(var(--spacing-scale) * 8);
+  --radius-12: calc(var(--spacing-scale) * 12);
+  --radius-16: calc(var(--spacing-scale) * 16);
+  --radius-24: calc(var(--spacing-scale) * 24);
+  --radius-full: 9999px;
+}
