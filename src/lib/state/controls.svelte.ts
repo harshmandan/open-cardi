@@ -3,6 +3,7 @@ import { CardiClient, type ConnectionState } from '$lib/ble';
 import * as cmd from '$lib/protocol/commands';
 import { ZONES, type ZoneId, type MicModeId } from '$lib/protocol/constants';
 import { pushError } from '$lib/state/notifications.svelte';
+import { logError, logRecv, logSend, logState } from '$lib/state/wirelog.svelte';
 
 export type Rgb = { r: number; g: number; b: number };
 
@@ -188,6 +189,7 @@ function ensureClient(): CardiClient {
 	client = new CardiClient({
 		onState: (s) => {
 			controls.connection = s;
+			logState(s);
 			if (s === 'disconnected') {
 				controls.deviceName = null;
 				pendingWrites.clear();
@@ -195,9 +197,14 @@ function ensureClient(): CardiClient {
 		},
 		onNotify: (data) => {
 			controls.lastNotify = data;
+			logRecv(data);
 		},
 		onError: (err) => {
+			logError(err.message);
 			pushError(err.message);
+		},
+		onSend: (data) => {
+			logSend(data);
 		}
 	});
 	return client;

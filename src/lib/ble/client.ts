@@ -12,6 +12,7 @@ export type CardiClientEvents = {
 	onState?: (state: ConnectionState) => void;
 	onNotify?: (data: Uint8Array) => void;
 	onError?: (err: Error) => void;
+	onSend?: (data: Uint8Array) => void;
 };
 
 export class CardiClient {
@@ -112,6 +113,7 @@ export class CardiClient {
 	async send(payload: Uint8Array): Promise<void> {
 		if (!this.writeChar) throw new Error('not connected');
 		const w = this.writeChar;
+		this.events.onSend?.(payload);
 		const next = this.writeTail.then(
 			() => w.writeValueWithoutResponse(payload as BufferSource),
 			() => w.writeValueWithoutResponse(payload as BufferSource)
