@@ -251,6 +251,9 @@ export async function setPattern(index: number) {
 	const z = controls.zones[controls.activeZone];
 	z.mode = 'pattern';
 	z.patternIndex = index;
+	// Pattern and mic are mutually exclusive on the MCU — the pattern command
+	// implicitly cancels mic mode, just sync the UI.
+	if (controls.mic.on) controls.mic.on = false;
 	await send(cmd.setPattern(index));
 	await send(cmd.setSpeed(controls.speed));
 	persistSession();
@@ -263,6 +266,7 @@ export async function togglePatternMode() {
 		await send(cmd.setColor(z.color.r, z.color.g, z.color.b, z.brightness));
 	} else {
 		z.mode = 'pattern';
+		if (controls.mic.on) controls.mic.on = false;
 		await send(cmd.setPattern(z.patternIndex));
 		await send(cmd.setSpeed(controls.speed));
 	}
@@ -278,6 +282,13 @@ export async function setSpeed(speed: number) {
 export async function setMicMode(on: boolean, mode: MicModeId = controls.mic.mode) {
 	controls.mic.on = on;
 	controls.mic.mode = mode;
+	if (on) {
+		// Mic supersedes pattern on the MCU. Clear pattern mode on every zone so
+		// the UI doesn't claim a pattern is active while the kit is mic-reactive.
+		for (const zone of ZONES) {
+			controls.zones[zone.id].mode = 'color';
+		}
+	}
 	await send(on ? cmd.micOn(mode) : cmd.micOff());
 	persistSession();
 }

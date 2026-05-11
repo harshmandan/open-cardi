@@ -9,7 +9,7 @@
 			href="https://harsh.ink"
 			target="_blank"
 			rel="noopener noreferrer"
-			class="font-500 hover:underline"
+			class="font-700 hover:underline"
 		>
 			Harsh Mandan ↗
 		</a>
