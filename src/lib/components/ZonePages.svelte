@@ -28,6 +28,17 @@
 		};
 		updateCell();
 		mq.addEventListener('change', updateCell);
+
+		// Land on the default zone (set by state) instead of the leftmost page.
+		// Wait one frame so the scroller has a width to compute against.
+		requestAnimationFrame(() => {
+			if (!scroller) return;
+			const idx = visibleZones.findIndex((z) => z.id === controls.activeZone);
+			if (idx > 0) {
+				scroller.scrollTo({ left: idx * scroller.clientWidth, behavior: 'instant' });
+			}
+		});
+
 		return () => mq.removeEventListener('change', updateCell);
 	});
 
