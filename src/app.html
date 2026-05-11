@@ -4,9 +4,154 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+
+		<title>open-cardi · Cardi Tech app alternative for K3 / K4 ambient lights</title>
+		<meta
+			name="description"
+			content="Open-source web app to control Cardi K3 and K4 Active Ultra ambient car lights from any browser. A free Cardi Tech app alternative — no Android, no ads, no tracking."
+		/>
+		<meta
+			name="keywords"
+			content="cardi tech app, cardi light app, cardi app, cardi tech, cardi lights, cardi lights app, cardi k3, cardi k3 app, cardi k4, cardi k4 app, cardi active ultra, cardi active ultra app, cardilits, cardilits app, cardi tech alternative, cardi web app, cardi browser app, ilits app, baoyin app, cachuang app, mtf-light app, aikon-lit app, consmart, consmart app, car ambient light app, rgb car interior, rgb car interior light app, web bluetooth car lights, open source cardi, open source cardi tech, ble car lighting controller, open-cardi, opencardi"
+		/>
+		<meta name="author" content="Harsh Mandan" />
+		<meta name="robots" content="index, follow, max-image-preview:large" />
+		<meta name="googlebot" content="index, follow" />
+		<link rel="canonical" href="https://opencardi.now.sh/" />
+
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="open-cardi" />
+		<meta property="og:title" content="open-cardi · free Cardi Tech app alternative" />
+		<meta
+			property="og:description"
+			content="Open-source web app for Cardi K3 / K4 Active Ultra ambient car lights. Browser-based — works on Android, macOS, Windows, Linux. No Android app required."
+		/>
+		<meta property="og:url" content="https://opencardi.now.sh/" />
+		<meta property="og:image" content="https://opencardi.now.sh/favicon.png" />
+		<meta property="og:image:width" content="512" />
+		<meta property="og:image:height" content="512" />
+		<meta property="og:image:alt" content="open-cardi logo" />
+		<meta property="og:locale" content="en_US" />
+
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content="open-cardi · free Cardi Tech app alternative" />
+		<meta
+			name="twitter:description"
+			content="Open-source web app for Cardi K3 / K4 ambient car lights. Browser-based, no Android required."
+		/>
+		<meta name="twitter:image" content="https://opencardi.now.sh/favicon.png" />
+
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="icon" type="image/png" href="/favicon.png" />
+		<link rel="apple-touch-icon" href="/favicon.png" />
+		<meta name="theme-color" content="#000000" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="open-cardi" />
+
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "WebApplication",
+				"name": "open-cardi",
+				"alternateName": ["Cardi Tech web app", "Open Cardi", "Cardi Tech alternative"],
+				"description": "Open-source Web Bluetooth replacement for the Cardi Tech Android app. Controls Cardi K3 and K4 Active Ultra RGB ambient car lighting kits, plus other ConSmart-family kits (iLits, BaoYin, MTF-LIGHT, AIKON-LIT, CarL, CaChuang, Dream, Flash) from any Chromium browser.",
+				"url": "https://opencardi.now.sh/",
+				"applicationCategory": "UtilitiesApplication",
+				"applicationSubCategory": "AutomotiveApplication",
+				"operatingSystem": "Android, macOS, Windows, Linux, ChromeOS, iOS (via Bluefy)",
+				"browserRequirements": "Web Bluetooth API (Chrome, Edge, Brave, Opera, Samsung Internet, Bluefy on iOS)",
+				"offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+				"isAccessibleForFree": true,
+				"author": { "@type": "Person", "name": "Harsh Mandan", "url": "https://harsh.ink" },
+				"license": "https://github.com/harshmandan/open-cardi/blob/main/LICENSE",
+				"codeRepository": "https://github.com/harshmandan/open-cardi",
+				"downloadUrl": "https://opencardi.now.sh/",
+				"screenshot": "https://opencardi.now.sh/favicon.png",
+				"featureList": [
+					"Bluetooth control of Cardi car ambient lights",
+					"Per-zone color and brightness",
+					"23 built-in lighting patterns",
+					"Music / mic-reactive modes",
+					"Installable as a PWA",
+					"Open source (MIT)"
+				]
+			}
+		</script>
+
+		<script type="application/ld+json">
+			{
+				"@context": "https://schema.org",
+				"@type": "FAQPage",
+				"mainEntity": [
+					{
+						"@type": "Question",
+						"name": "Is there an alternative to the Cardi Tech app?",
+						"acceptedAnswer": {
+							"@type": "Answer",
+							"text": "Yes — open-cardi is a free, open-source web-based alternative to the Cardi Tech app. It runs in any Chromium browser and controls Cardi K3 / K4 Active Ultra ambient lighting kits over Bluetooth without needing the official Android app."
+						}
+					},
+					{
+						"@type": "Question",
+						"name": "Which Cardi devices are supported?",
+						"acceptedAnswer": {
+							"@type": "Answer",
+							"text": "open-cardi supports Cardi K3 Active Ultra and Cardi K4 Active Ultra, plus any ConSmart-family ambient light kit advertising BLE service 0xFFF0 — including iLits, BaoYin, CaChuang, CarL, MTF-LIGHT, AIKON-LIT, Dream, and Flash branded kits."
+						}
+					},
+					{
+						"@type": "Question",
+						"name": "Does the Cardi Tech web app work on iPhone?",
+						"acceptedAnswer": {
+							"@type": "Answer",
+							"text": "iOS Safari does not support Web Bluetooth, but open-cardi works on iPhone if you open it in the Bluefy browser (free, App Store)."
+						}
+					},
+					{
+						"@type": "Question",
+						"name": "Is open-cardi free?",
+						"acceptedAnswer": {
+							"@type": "Answer",
+							"text": "Yes. open-cardi is fully free and open source under the MIT license. It contains no ads, no tracking, and no in-app purchases."
+						}
+					},
+					{
+						"@type": "Question",
+						"name": "Can I install open-cardi as an app?",
+						"acceptedAnswer": {
+							"@type": "Answer",
+							"text": "Yes. open-cardi is a Progressive Web App — on Android tap the install button in the header, on desktop Chrome / Edge use the install icon in the address bar."
+						}
+					}
+				]
+			}
+		</script>
+
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
 		<div style="display: contents">%sveltekit.body%</div>
+		<noscript>
+			<div style="padding: 24px; color: #fff; background: #000; font-family: sans-serif;">
+				<h1>open-cardi — free Cardi Tech app alternative</h1>
+				<p>
+					open-cardi is an open-source web app that replaces the official Cardi Tech Android app
+					for controlling Cardi K3 and K4 Active Ultra ambient car lights over Bluetooth. It also
+					works with other ConSmart-family kits including iLits, BaoYin, CaChuang, CarL, MTF-LIGHT,
+					AIKON-LIT, Dream, and Flash branded ambient lighting.
+				</p>
+				<p>
+					This app requires JavaScript and the Web Bluetooth API. Please enable JavaScript and open
+					this page in Google Chrome, Microsoft Edge, Brave, Opera, Samsung Internet, or Bluefy on
+					iOS.
+				</p>
+				<p>
+					Source code on
+					<a href="https://github.com/harshmandan/open-cardi">GitHub</a>.
+				</p>
+			</div>
+		</noscript>
 	</body>
 </html>
