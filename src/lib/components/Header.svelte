@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { CardiClient } from '$lib/ble';
-	import { ICON_INSTALL } from './icons.svelte';
+	import { ICON_HELP, ICON_INSTALL } from './icons.svelte';
 	import { connect, controls, disconnect, openHelp } from '$lib/state/controls.svelte';
 	import { pushError } from '$lib/state/notifications.svelte';
 
@@ -86,9 +86,9 @@
 			type="button"
 			onclick={openHelp}
 			aria-label="Help"
-			class="flex size-28 items-center justify-center border border-foreground/15 text-12 font-500 hover:bg-foreground/5"
+			class="flex size-28 items-center justify-center border border-foreground/15 hover:bg-foreground/5"
 		>
-			?
+			<span class="size-16" aria-hidden="true">{@html ICON_HELP}</span>
 		</button>
 
 		{#if deferredPrompt}

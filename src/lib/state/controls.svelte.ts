@@ -97,7 +97,7 @@ export const controls = $state({
 	connection: 'disconnected' as ConnectionState,
 	deviceName: null as string | null,
 	masterOn: session.masterOn ?? true,
-	activeZone: 'overall' as ZoneId,
+	activeZone: 'guide' as ZoneId,
 	speed: session.speed ?? 50,
 	mic: {
 		on: session.mic?.on ?? false,

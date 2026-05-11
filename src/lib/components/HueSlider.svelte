@@ -78,9 +78,7 @@
 		background: linear-gradient(
 			to right,
 			#ffffff 0%,
-			#ffffff 5%,
 			#ffc882 5%,
-			#ffc882 10%,
 			#ff0000 10%,
 			#ffff00 25%,
 			#00ff00 40%,
