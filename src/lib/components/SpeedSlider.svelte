@@ -46,7 +46,7 @@
 		background: transparent;
 		outline: none;
 		cursor: pointer;
-		touch-action: none;
+		touch-action: pan-y;
 	}
 	.speed-slider::-webkit-slider-runnable-track {
 		height: 2px;

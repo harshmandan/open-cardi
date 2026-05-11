@@ -45,20 +45,20 @@
 		></button>
 
 		<div
-			class="relative w-full bg-background border-t border-foreground/10"
+			class="relative w-full max-h-[80dvh] bg-background border-t border-foreground/10 flex flex-col"
 			transition:fly={{ y: 400, duration: 220, easing: cubicOut }}
 		>
-			<div class="mx-auto max-w-720 flex flex-col gap-16 p-16">
-				<div class="flex items-center justify-center">
-					<button
-						type="button"
-						onclick={toggleMore}
-						aria-label="Close"
-						class="chevron-down size-20 opacity-70 hover:opacity-100"
-					>
-						{@html ICON_CHEVRON}
-					</button>
-				</div>
+			<div class="mx-auto w-full max-w-720 shrink-0 flex items-center justify-center p-16">
+				<button
+					type="button"
+					onclick={toggleMore}
+					aria-label="Close"
+					class="chevron-down size-20 opacity-70 hover:opacity-100"
+				>
+					{@html ICON_CHEVRON}
+				</button>
+			</div>
+			<div class="mx-auto w-full max-w-720 flex-1 min-h-0 overflow-y-auto flex flex-col gap-16 px-16 pb-16">
 				<PatternPicker />
 				<MicModeSelector />
 				<ShowAllZonesToggle />

@@ -61,7 +61,7 @@
 		);
 		outline: none;
 		cursor: pointer;
-		touch-action: none;
+		touch-action: pan-y;
 	}
 	.hue-slider::-webkit-slider-thumb {
 		appearance: none;

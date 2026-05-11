@@ -55,6 +55,7 @@ type SessionSnapshot = {
 	mic: { on: boolean; mode: MicModeId };
 	masterOn: boolean;
 	showAllZones: boolean;
+	moreOpen: boolean;
 };
 
 function loadSession(): Partial<SessionSnapshot> {
@@ -77,7 +78,8 @@ function persistSession() {
 			speed: controls.speed,
 			mic: { on: controls.mic.on, mode: controls.mic.mode },
 			masterOn: controls.masterOn,
-			showAllZones: controls.showAllZones
+			showAllZones: controls.showAllZones,
+			moreOpen: controls.moreOpen
 		};
 		localStorage.setItem(SESSION_KEY, JSON.stringify(snapshot));
 	} catch {
@@ -102,7 +104,7 @@ export const controls = $state({
 		ZONES.map((z) => [z.id, restoredZones?.[z.id] ?? initialZone()])
 	) as Record<ZoneId, ZoneState>,
 	favorites: loadFavorites(),
-	moreOpen: false,
+	moreOpen: session.moreOpen ?? false,
 	helpOpen: false,
 	showAllZones: session.showAllZones ?? false,
 	lastNotify: null as Uint8Array | null,
@@ -111,6 +113,7 @@ export const controls = $state({
 
 export function toggleMore() {
 	controls.moreOpen = !controls.moreOpen;
+	persistSession();
 }
 
 export function openHelp() {
