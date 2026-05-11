@@ -26,9 +26,9 @@
 	const SHARED = {
 		viewBox: '0 0 2752 1536',
 		aspectRatio: '2752 / 1536',
-		blur: 80,
-		glowWidth: 6,
-		coreWidth: 1.5
+		blur: 40,
+		glowWidth: 10,
+		coreWidth: 3
 	};
 
 	// overall.webp shows every interior strip; guide & floor reuse this view
@@ -88,9 +88,9 @@
 			...SHARED,
 			// thinner strokes + more blur — the moonroof outline is long and
 			// straight so the default widths read as harsh lines
-			glowWidth: 4,
-			coreWidth: 1,
-			blur: 110,
+			glowWidth: 7,
+			coreWidth: 2,
+			blur: 55,
 			glows: [
 				{ d: 'M735 875.5L820.5 852M1932 850L2020 873.5', sourceZone: 'doors' },
 				{
@@ -103,9 +103,9 @@
 			image: '/grill.webp',
 			...SHARED,
 			// grill light should bloom more — bump blur, slim core
-			blur: 140,
-			glowWidth: 6,
-			coreWidth: 1.5,
+			blur: 70,
+			glowWidth: 10,
+			coreWidth: 3,
 			glows: [
 				{
 					d: 'M919 966.5L1015.5 968.5M1165.5 971H1615M1777 969.5L1863 967.5',
@@ -295,6 +295,7 @@
 	}
 	.glow-svg path {
 		transition: stroke 200ms ease-out, opacity 200ms ease-out, fill 200ms ease-out;
+		mix-blend-mode: screen;
 	}
 	.fill-glow {
 		mix-blend-mode: screen;
@@ -308,7 +309,7 @@
 			var(--c) 2%,
 			transparent 18%
 		);
-		filter: blur(45px);
+		filter: blur(20px);
 		opacity: var(--o);
 		pointer-events: none;
 		transition: background 200ms ease-out, opacity 200ms ease-out;
