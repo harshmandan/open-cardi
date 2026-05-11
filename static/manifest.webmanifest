@@ -1,0 +1,27 @@
+{
+	"name": "open-cardi — Cardi Tech app alternative",
+	"short_name": "open-cardi",
+	"description": "Free open-source web app to control Cardi K3 / K4 Active Ultra ambient car lights from any browser. A Cardi Tech app alternative — no Android required, no ads, no tracking.",
+	"categories": ["utilities", "lifestyle", "productivity"],
+	"start_url": "/",
+	"scope": "/",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#000000",
+	"theme_color": "#000000",
+	"lang": "en",
+	"icons": [
+		{
+			"src": "/favicon.svg",
+			"type": "image/svg+xml",
+			"sizes": "any",
+			"purpose": "any"
+		},
+		{
+			"src": "/favicon.png",
+			"type": "image/png",
+			"sizes": "512x512",
+			"purpose": "any maskable"
+		}
+	]
+}
