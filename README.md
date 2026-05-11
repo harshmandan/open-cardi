@@ -2,7 +2,7 @@
 
 A [Web Bluetooth](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth_API) replacement for the **Cardi Tech** Android app — controls Cardi K3 / K4 Active Ultra (and other ConSmart-family) RGB ambient lighting kits from any Chromium browser.
 
-→ **[opencardi.now.sh](https://opencardi.now.sh)**
+→ **[opencardi.vercel.app](https://opencardi.vercel.app)**
 → Writeup: [Reverse-engineering the Cardi Tech BLE protocol](https://harsh.ink/blog/reverse-engineering-cardi-tech)
 
 ## How it works
