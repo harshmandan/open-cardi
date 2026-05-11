@@ -42,7 +42,7 @@
 		></button>
 
 		<div
-			class="relative w-full max-w-440 max-h-full overflow-y-auto bg-background border border-foreground/15 p-20 flex flex-col gap-16"
+			class="relative w-full max-w-512 max-h-full overflow-y-auto bg-background border border-foreground/15 p-20 flex flex-col gap-16"
 			transition:scale={{ start: 0.95, duration: 200, easing: cubicOut, opacity: 0 }}
 		>
 			<header class="flex flex-col gap-4">

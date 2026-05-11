@@ -5,6 +5,10 @@ A [Web Bluetooth](https://developer.mozilla.org/en-US/docs/Web/API/Web_Bluetooth
 → **[opencardi.vercel.app](https://opencardi.vercel.app)**
 → Writeup: [Reverse-engineering the Cardi Tech BLE protocol](https://harsh.ink/blog/reverse-engineering-cardi-tech)
 
+## Replaces
+
+Official Android app: **Cardi Tech** ([`com.qc.xq`](https://play.google.com/store/apps/details?id=com.qc.xq) on Google Play) by Guangzhou Cardi Auto Parts. open-cardi reverse-engineers the same BLE protocol and runs in any Chromium browser — no Android, no ads, no tracking.
+
 ## How it works
 
 The kit's MCU is a Beken BK343x exposing a single GATT service (`0xFFF0`) with a write characteristic (`0xFFE2`, write-without-response) and a notify characteristic (`0xFFE1`). All commands are short framed packets — most are 6 bytes `ED <op> <a> <b> <c> E9`, plus a few odd ones (`FE _ EF` for zone select, `30 _ 03` for speed, `FA _ AF` for app mode).
