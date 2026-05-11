@@ -20,6 +20,10 @@ export class CardiClient {
 	private notifyChar: BluetoothRemoteGATTCharacteristic | null = null;
 	private events: CardiClientEvents;
 	private state: ConnectionState = 'disconnected';
+	// Tail of the GATT write chain. Every send() awaits the previous write so
+	// Web Bluetooth never sees overlapping operations (which Chrome rejects with
+	// "GATT operation in progress" and can drop the link on Android).
+	private writeTail: Promise<unknown> = Promise.resolve();
 
 	constructor(events: CardiClientEvents = {}) {
 		this.events = events;
@@ -59,10 +63,12 @@ export class CardiClient {
 		this.device.addEventListener('gattserverdisconnected', () => {
 			this.writeChar = null;
 			this.notifyChar = null;
+			this.writeTail = Promise.resolve();
 			this.setState('disconnected');
 		});
 
 		this.setState('connecting');
+		this.writeTail = Promise.resolve();
 		const server = await this.device.gatt!.connect();
 		const service = await server.getPrimaryService(SERVICE_UUID);
 		this.writeChar = await service.getCharacteristic(WRITE_CHARACTERISTIC);
@@ -86,17 +92,24 @@ export class CardiClient {
 		}
 		this.writeChar = null;
 		this.notifyChar = null;
+		this.writeTail = Promise.resolve();
 		this.setState('disconnected');
 	}
 
 	async send(payload: Uint8Array): Promise<void> {
 		if (!this.writeChar) throw new Error('not connected');
-		await this.writeChar.writeValueWithoutResponse(payload as BufferSource);
+		const w = this.writeChar;
+		const next = this.writeTail.then(
+			() => w.writeValueWithoutResponse(payload as BufferSource),
+			() => w.writeValueWithoutResponse(payload as BufferSource)
+		);
+		this.writeTail = next.catch(() => undefined);
+		await next;
 	}
 
 	private async runHandshake(): Promise<void> {
 		for (const w of HANDSHAKE_WRITES) {
-			await this.writeChar!.writeValueWithoutResponse(w as BufferSource);
+			await this.send(w);
 			await sleep(100);
 		}
 	}

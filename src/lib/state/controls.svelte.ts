@@ -131,12 +131,50 @@ export function toggleShowAllZones() {
 
 let client: CardiClient | null = null;
 
+// Latest-wins coalescer for BLE writes. Slider drags fire many events per
+// second; without coalescing they'd pile up in the GATT queue, lag the device,
+// and on Android the overflow surfaces as "GATT operation in progress" and
+// drops the link. We keep one pending payload per command kind and only drain
+// the freshest value once the prior write completes.
+const pendingWrites = new Map<string, Uint8Array>();
+let draining = false;
+
+function sendCoalesced(kind: string, bytes: Uint8Array) {
+	if (!client?.connected) return;
+	pendingWrites.set(kind, bytes);
+	if (draining) return;
+	void drainWrites();
+}
+
+async function drainWrites() {
+	if (draining) return;
+	draining = true;
+	try {
+		while (pendingWrites.size > 0 && client?.connected) {
+			const it = pendingWrites.entries().next();
+			if (it.done) break;
+			const [kind, payload] = it.value;
+			pendingWrites.delete(kind);
+			try {
+				await client.send(payload);
+			} catch (err) {
+				controls.error = err instanceof Error ? err.message : String(err);
+			}
+		}
+	} finally {
+		draining = false;
+	}
+}
+
 function ensureClient(): CardiClient {
 	if (client) return client;
 	client = new CardiClient({
 		onState: (s) => {
 			controls.connection = s;
-			if (s === 'disconnected') controls.deviceName = null;
+			if (s === 'disconnected') {
+				controls.deviceName = null;
+				pendingWrites.clear();
+			}
 		},
 		onNotify: (data) => {
 			controls.lastNotify = data;
@@ -165,29 +203,20 @@ export async function disconnect() {
 	await client?.disconnect();
 }
 
-async function send(bytes: Uint8Array) {
-	if (!client?.connected) return;
-	try {
-		await client.send(bytes);
-	} catch (err) {
-		controls.error = err instanceof Error ? err.message : String(err);
-	}
-}
-
 function applyZoneColorToWire(id: ZoneId) {
 	const z = controls.zones[id];
-	send(cmd.setColor(z.color.r, z.color.g, z.color.b, z.brightness));
+	sendCoalesced('color', cmd.setColor(z.color.r, z.color.g, z.color.b, z.brightness));
 }
 
 export async function selectZone(id: ZoneId) {
 	controls.activeZone = id;
 	if (!client?.connected) return;
-	await send(cmd.selectZone(zoneValue(id)));
+	sendCoalesced('zone', cmd.selectZone(zoneValue(id)));
 }
 
 export async function setMaster(on: boolean) {
 	controls.masterOn = on;
-	await send(on ? cmd.masterOn() : cmd.masterOff());
+	sendCoalesced('master', on ? cmd.masterOn() : cmd.masterOff());
 	persistSession();
 }
 
@@ -254,8 +283,8 @@ export async function setPattern(index: number) {
 	// Pattern and mic are mutually exclusive on the MCU — the pattern command
 	// implicitly cancels mic mode, just sync the UI.
 	if (controls.mic.on) controls.mic.on = false;
-	await send(cmd.setPattern(index));
-	await send(cmd.setSpeed(controls.speed));
+	sendCoalesced('pattern', cmd.setPattern(index));
+	sendCoalesced('speed', cmd.setSpeed(controls.speed));
 	persistSession();
 }
 
@@ -263,19 +292,19 @@ export async function togglePatternMode() {
 	const z = controls.zones[controls.activeZone];
 	if (z.mode === 'pattern') {
 		z.mode = 'color';
-		await send(cmd.setColor(z.color.r, z.color.g, z.color.b, z.brightness));
+		sendCoalesced('color', cmd.setColor(z.color.r, z.color.g, z.color.b, z.brightness));
 	} else {
 		z.mode = 'pattern';
 		if (controls.mic.on) controls.mic.on = false;
-		await send(cmd.setPattern(z.patternIndex));
-		await send(cmd.setSpeed(controls.speed));
+		sendCoalesced('pattern', cmd.setPattern(z.patternIndex));
+		sendCoalesced('speed', cmd.setSpeed(controls.speed));
 	}
 	persistSession();
 }
 
 export async function setSpeed(speed: number) {
 	controls.speed = speed;
-	await send(cmd.setSpeed(speed));
+	sendCoalesced('speed', cmd.setSpeed(speed));
 	persistSession();
 }
 
@@ -289,6 +318,6 @@ export async function setMicMode(on: boolean, mode: MicModeId = controls.mic.mod
 			controls.zones[zone.id].mode = 'color';
 		}
 	}
-	await send(on ? cmd.micOn(mode) : cmd.micOff());
+	sendCoalesced('mic', on ? cmd.micOn(mode) : cmd.micOff());
 	persistSession();
 }
