@@ -126,8 +126,14 @@
 
 	function effective(id: ZoneId) {
 		const z = controls.zones[id];
+		const lighten = (c: number) => Math.round(c + (255 - c) * 0.7);
 		return {
 			color: rgbToHex(z.color),
+			light: rgbToHex({
+				r: lighten(z.color.r),
+				g: lighten(z.color.g),
+				b: lighten(z.color.b)
+			}),
 			opacity: controls.masterOn ? z.brightness / 100 : 0
 		};
 	}
@@ -138,12 +144,44 @@
 
 <div class="scene" style:aspect-ratio={visual.aspectRatio}>
 	{#if visual.mode === 'blob'}
-		<div
-			class="blob"
-			style:--c={blobFx.color}
-			style:--o={blobFx.opacity}
+		<!-- Two overlapping circles filled with the same radial gradient pinned
+		     to the blob's center. Solid color out to 80% of the gradient radius,
+		     then fades to transparent over the last 20%. A small blur softens
+		     the union edge so the two circles read as one organic shape. -->
+		<svg
+			class="blob-svg"
+			viewBox="0 0 100 56"
+			preserveAspectRatio="xMidYMid meet"
 			aria-hidden="true"
-		></div>
+		>
+			<defs>
+				<radialGradient
+					id="blob-grad-{pageZone}"
+					cx="49.5"
+					cy="28.5"
+					r="16"
+					gradientUnits="userSpaceOnUse"
+				>
+					<stop offset="0%" stop-color={blobFx.light} stop-opacity="1" />
+					<stop offset="1%" stop-color={blobFx.light} stop-opacity="1" />
+					<stop offset="25%" stop-color={blobFx.color} stop-opacity="1" />
+					<stop offset="100%" stop-color={blobFx.color} stop-opacity="0" />
+				</radialGradient>
+				<filter
+					id="blob-glow-{pageZone}"
+					x="-50%"
+					y="-50%"
+					width="200%"
+					height="200%"
+				>
+					<feGaussianBlur stdDeviation="2" />
+				</filter>
+			</defs>
+			<g filter="url(#blob-glow-{pageZone})" opacity={blobFx.opacity}>
+				<circle class="blob-c1" cx="46" cy="26" r="8" fill="url(#blob-grad-{pageZone})" />
+				<circle class="blob-c2" cx="53" cy="31" r="10" fill="url(#blob-grad-{pageZone})" />
+			</g>
+		</svg>
 	{:else}
 		{#if visual.image}
 			<img src={visual.image} alt="" class="base" />
@@ -300,19 +338,43 @@
 	.fill-glow {
 		mix-blend-mode: screen;
 	}
-	.blob {
+	.blob-svg {
 		position: absolute;
 		inset: 0;
-		background: radial-gradient(
-			circle at center,
-			var(--c) 0%,
-			var(--c) 2%,
-			transparent 18%
-		);
-		filter: blur(20px);
-		opacity: var(--o);
+		width: 100%;
+		height: 100%;
 		pointer-events: none;
-		transition: background 200ms ease-out, opacity 200ms ease-out;
+	}
+	.blob-svg circle {
+		transition: fill 200ms ease-out;
+		transform-box: fill-box;
+		transform-origin: center;
+	}
+	.blob-svg g {
+		transition: opacity 200ms ease-out;
+	}
+	/* Two circles scale independently at slightly different cadences so the
+	   gooey-merged shape constantly morphs (translates the velocity-driven
+	   "static" example from the CodePen reference into CSS). */
+	.blob-c1 {
+		animation: blob-c1 5.5s ease-in-out 0.5s infinite alternate;
+	}
+	.blob-c2 {
+		animation: blob-c2 7.5s ease-in-out 0.8s infinite alternate;
+	}
+	@keyframes blob-c1 {
+		from { transform: scale(0.9); }
+		to { transform: scale(1.3); }
+	}
+	@keyframes blob-c2 {
+		from { transform: scale(0.7); }
+		to { transform: scale(1.2); }
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.blob-c1,
+		.blob-c2 {
+			animation: none;
+		}
 	}
 	.off-veil {
 		position: absolute;
