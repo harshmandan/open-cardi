@@ -1,12 +1,12 @@
 <div align="center">
 
-  <img src="./static/favicon.png" alt="open-cardi" width="300" />
+  <img src="./static/favicon.png" alt="open-cardi" width="128" />
 
   <h1>open-cardi</h1>
 
 </div>
 
-A beautiful web-app replacement for the **Cardi Tech** ([`com.qc.xq`](https://play.google.com/store/apps/details?id=com.qc.xq) Android app — controls Cardi K3 / K4 Active Ultra (and other ConSmart-family) RGB ambient lighting kits from any Chromium browser. open-cardi reverse-engineers the same BLE protocol and runs in any Chromium browser — no Android, no ads, no tracking.
+A beautiful web-app replacement for the **Cardi Tech** Android app ([`com.qc.xq`](https://play.google.com/store/apps/details?id=com.qc.xq)) — controls Cardi K3 / K4 Active Ultra (and other ConSmart-family) RGB ambient lighting kits from any Chromium browser. open-cardi reverse-engineers the same BLE protocol — no Android, no ads, no tracking.
 
 <img src="./static/preview.png" alt="app-preview" width="600" />
 
