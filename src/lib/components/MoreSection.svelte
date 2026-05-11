@@ -16,6 +16,11 @@
 		display: inline-flex;
 		transform: rotate(90deg);
 	}
+	/* Extra breathing room below Credits on the mobile sheet, lifted clear of
+	   any iOS safe-area inset so the last item never sits under the home bar. */
+	.sheet-pad-bottom {
+		padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+	}
 </style>
 
 {#if mode === 'sidebar'}
@@ -59,7 +64,7 @@
 				</button>
 			</div>
 			<div
-				class="mx-auto w-full max-w-720 flex-1 min-h-0 overflow-y-auto flex flex-col gap-16 px-16 pb-16"
+				class="mx-auto w-full max-w-720 flex-1 min-h-0 overflow-y-auto flex flex-col gap-16 px-16 sheet-pad-bottom"
 				style="overscroll-behavior: contain;"
 			>
 				<PatternPicker />

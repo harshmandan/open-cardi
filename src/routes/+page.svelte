@@ -29,7 +29,7 @@
 
 		<main class="flex-1 min-h-0 flex flex-col">
 			<ZonePages />
-			<div class="shrink-0 p-16 anim-enter anim-enter-2">
+			<div class="shrink-0 controls-pad anim-enter anim-enter-2">
 				<ControlRack />
 			</div>
 		</main>
@@ -75,5 +75,15 @@
 	.main {
 		display: flex;
 		flex-direction: column;
+	}
+	/* 16px padding on all sides; on mobile bump the bottom to 32px (plus any
+	   iOS safe-area inset) so the controls clear the home bar. */
+	.controls-pad {
+		padding: 16px;
+	}
+	@media (max-width: 767px) {
+		.controls-pad {
+			padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+		}
 	}
 </style>
