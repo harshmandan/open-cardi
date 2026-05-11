@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { CardiClient } from '$lib/ble';
+	import { ICON_INSTALL } from './icons.svelte';
 	import { connect, controls, disconnect, openHelp } from '$lib/state/controls.svelte';
+	import { pushError } from '$lib/state/notifications.svelte';
 
 	const supported = $derived(typeof navigator !== 'undefined' && CardiClient.isSupported());
 
@@ -64,15 +66,22 @@
 
 	async function onInstallClick() {
 		if (!deferredPrompt) return;
-		await deferredPrompt.prompt();
-		const { outcome } = await deferredPrompt.userChoice;
-		if (outcome === 'accepted') deferredPrompt = null;
+		try {
+			await deferredPrompt.prompt();
+			const { outcome } = await deferredPrompt.userChoice;
+			if (outcome === 'accepted') deferredPrompt = null;
+		} catch (err) {
+			pushError(err instanceof Error ? err.message : String(err));
+		}
 	}
 </script>
 
 <header class="relative z-10 flex items-center justify-between gap-12 bg-transparent px-16 py-12">
 	<div class="flex items-center gap-8">
 		<h1 class="text-14 font-700 lowercase">open-cardi</h1>
+	</div>
+
+	<div class="flex items-center gap-8">
 		<button
 			type="button"
 			onclick={openHelp}
@@ -81,16 +90,16 @@
 		>
 			?
 		</button>
-	</div>
 
-	<div class="flex items-center gap-8">
 		{#if deferredPrompt}
 			<button
 				type="button"
 				onclick={onInstallClick}
-				class="border border-foreground/15 px-10 py-6 text-12 font-500 lowercase hover:bg-foreground/5"
+				aria-label="Install"
+				title="Install app"
+				class="flex size-28 items-center justify-center border border-foreground/15 hover:bg-foreground/5"
 			>
-				install
+				<span class="size-16" aria-hidden="true">{@html ICON_INSTALL}</span>
 			</button>
 		{/if}
 

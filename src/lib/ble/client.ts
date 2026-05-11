@@ -52,36 +52,49 @@ export class CardiClient {
 		}
 
 		this.setState('requesting');
-		this.device = await navigator.bluetooth.requestDevice({
-			filters: [
-				{ services: [SERVICE_UUID] },
-				...DEVICE_NAME_PREFIXES.map((namePrefix) => ({ namePrefix }))
-			],
-			optionalServices: [SERVICE_UUID]
-		});
+		try {
+			this.device = await navigator.bluetooth.requestDevice({
+				filters: [
+					{ services: [SERVICE_UUID] },
+					...DEVICE_NAME_PREFIXES.map((namePrefix) => ({ namePrefix }))
+				],
+				optionalServices: [SERVICE_UUID]
+			});
 
-		this.device.addEventListener('gattserverdisconnected', () => {
+			this.device.addEventListener('gattserverdisconnected', () => {
+				this.writeChar = null;
+				this.notifyChar = null;
+				this.writeTail = Promise.resolve();
+				this.setState('disconnected');
+			});
+
+			this.setState('connecting');
+			this.writeTail = Promise.resolve();
+			const server = await this.device.gatt!.connect();
+			const service = await server.getPrimaryService(SERVICE_UUID);
+			this.writeChar = await service.getCharacteristic(WRITE_CHARACTERISTIC);
+			this.notifyChar = await service.getCharacteristic(NOTIFY_CHARACTERISTIC);
+
+			await this.notifyChar.startNotifications();
+			this.notifyChar.addEventListener('characteristicvaluechanged', (e) => {
+				const v = (e.target as BluetoothRemoteGATTCharacteristic).value;
+				if (v) this.events.onNotify?.(new Uint8Array(v.buffer));
+			});
+
+			await this.runHandshake();
+			this.setState('connected');
+		} catch (err) {
 			this.writeChar = null;
 			this.notifyChar = null;
 			this.writeTail = Promise.resolve();
+			try {
+				this.device?.gatt?.disconnect();
+			} catch {
+				// ignore
+			}
 			this.setState('disconnected');
-		});
-
-		this.setState('connecting');
-		this.writeTail = Promise.resolve();
-		const server = await this.device.gatt!.connect();
-		const service = await server.getPrimaryService(SERVICE_UUID);
-		this.writeChar = await service.getCharacteristic(WRITE_CHARACTERISTIC);
-		this.notifyChar = await service.getCharacteristic(NOTIFY_CHARACTERISTIC);
-
-		await this.notifyChar.startNotifications();
-		this.notifyChar.addEventListener('characteristicvaluechanged', (e) => {
-			const v = (e.target as BluetoothRemoteGATTCharacteristic).value;
-			if (v) this.events.onNotify?.(new Uint8Array(v.buffer));
-		});
-
-		await this.runHandshake();
-		this.setState('connected');
+			throw err;
+		}
 	}
 
 	async disconnect(): Promise<void> {

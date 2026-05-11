@@ -4,6 +4,7 @@
 	import { fade, scale } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import { closeHelp, controls, openHelp } from '$lib/state/controls.svelte';
+	import { pushError } from '$lib/state/notifications.svelte';
 
 	const SEEN_KEY = 'open-cardi.help-seen.v1';
 
@@ -11,16 +12,16 @@
 		if (!browser) return;
 		try {
 			if (!localStorage.getItem(SEEN_KEY)) openHelp();
-		} catch {
-			// localStorage unavailable; just skip auto-open
+		} catch (err) {
+			pushError(`Couldn't read help-seen flag: ${err instanceof Error ? err.message : String(err)}`);
 		}
 	});
 
 	function dismiss() {
 		try {
 			if (browser) localStorage.setItem(SEEN_KEY, '1');
-		} catch {
-			// ignore
+		} catch (err) {
+			pushError(`Couldn't save help-seen flag: ${err instanceof Error ? err.message : String(err)}`);
 		}
 		closeHelp();
 	}

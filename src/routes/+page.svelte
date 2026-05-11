@@ -4,6 +4,7 @@
 	import Header from '$lib/components/Header.svelte';
 	import HelpDialog from '$lib/components/HelpDialog.svelte';
 	import MoreSection from '$lib/components/MoreSection.svelte';
+	import Notifications from '$lib/components/Notifications.svelte';
 	import ZonePages from '$lib/components/ZonePages.svelte';
 	import { controls } from '$lib/state/controls.svelte';
 
@@ -47,13 +48,7 @@
 
 <HelpDialog />
 
-{#if controls.error}
-	<div
-		class="fixed top-12 left-1/2 z-[70] -translate-x-1/2 border border-red bg-red/10 px-12 py-6 text-12 backdrop-blur-xs"
-	>
-		{controls.error}
-	</div>
-{/if}
+<Notifications />
 
 <style>
 	.app {

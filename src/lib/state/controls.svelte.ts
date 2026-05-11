@@ -2,6 +2,7 @@ import { browser } from '$app/environment';
 import { CardiClient, type ConnectionState } from '$lib/ble';
 import * as cmd from '$lib/protocol/commands';
 import { ZONES, type ZoneId, type MicModeId } from '$lib/protocol/constants';
+import { pushError } from '$lib/state/notifications.svelte';
 
 export type Rgb = { r: number; g: number; b: number };
 
@@ -35,7 +36,8 @@ function loadFavorites(): Favorite[] {
 		if (!raw) return [];
 		const parsed = JSON.parse(raw);
 		return Array.isArray(parsed) ? parsed : [];
-	} catch {
+	} catch (err) {
+		pushError(`Couldn't load favorites: ${err instanceof Error ? err.message : String(err)}`);
 		return [];
 	}
 }
@@ -44,8 +46,8 @@ function saveFavorites(list: Favorite[]) {
 	if (!browser) return;
 	try {
 		localStorage.setItem(FAV_KEY, JSON.stringify(list));
-	} catch {
-		// quota or serialization issue — ignore
+	} catch (err) {
+		pushError(`Couldn't save favorites: ${err instanceof Error ? err.message : String(err)}`);
 	}
 }
 
@@ -65,7 +67,8 @@ function loadSession(): Partial<SessionSnapshot> {
 		if (!raw) return {};
 		const parsed = JSON.parse(raw);
 		return typeof parsed === 'object' && parsed !== null ? parsed : {};
-	} catch {
+	} catch (err) {
+		pushError(`Couldn't restore session: ${err instanceof Error ? err.message : String(err)}`);
 		return {};
 	}
 }
@@ -82,8 +85,8 @@ function persistSession() {
 			moreOpen: controls.moreOpen
 		};
 		localStorage.setItem(SESSION_KEY, JSON.stringify(snapshot));
-	} catch {
-		// ignore
+	} catch (err) {
+		pushError(`Couldn't save session: ${err instanceof Error ? err.message : String(err)}`);
 	}
 }
 
@@ -107,8 +110,7 @@ export const controls = $state({
 	moreOpen: session.moreOpen ?? false,
 	helpOpen: false,
 	showAllZones: session.showAllZones ?? false,
-	lastNotify: null as Uint8Array | null,
-	error: null as string | null
+	lastNotify: null as Uint8Array | null
 });
 
 export function toggleMore() {
@@ -158,7 +160,7 @@ async function drainWrites() {
 			try {
 				await client.send(payload);
 			} catch (err) {
-				controls.error = err instanceof Error ? err.message : String(err);
+				pushError(err instanceof Error ? err.message : String(err));
 			}
 		}
 	} finally {
@@ -180,7 +182,7 @@ function ensureClient(): CardiClient {
 			controls.lastNotify = data;
 		},
 		onError: (err) => {
-			controls.error = err.message;
+			pushError(err.message);
 		}
 	});
 	return client;
@@ -189,13 +191,12 @@ function ensureClient(): CardiClient {
 const zoneValue = (id: ZoneId): number => ZONES.find((z) => z.id === id)?.value ?? 1;
 
 export async function connect() {
-	controls.error = null;
 	try {
 		const c = ensureClient();
 		await c.connect();
 		controls.deviceName = c.deviceName;
 	} catch (err) {
-		controls.error = err instanceof Error ? err.message : String(err);
+		pushError(err instanceof Error ? err.message : String(err));
 	}
 }
 
