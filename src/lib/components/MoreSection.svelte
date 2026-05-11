@@ -21,7 +21,7 @@
 {#if mode === 'sidebar'}
 	{#if controls.moreOpen}
 		<aside
-			class="flex h-full flex-1 basis-1/2 max-w-[50%] flex-col gap-20 bg-background p-16 overflow-y-auto"
+			class="flex h-full w-full flex-col gap-20 bg-background p-16 overflow-y-auto"
 			transition:fly={{ x: 300, duration: 250, easing: cubicOut }}
 		>
 			<PatternPicker />
