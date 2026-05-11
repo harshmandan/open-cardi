@@ -7,7 +7,7 @@ import { pushError } from '$lib/state/notifications.svelte';
 export type Rgb = { r: number; g: number; b: number };
 
 export type ZoneState = {
-	mode: 'color' | 'pattern';
+	mode: 'color' | 'pattern' | 'warmwhite';
 	color: Rgb;
 	brightness: number;
 	patternIndex: number;
@@ -204,9 +204,15 @@ export async function disconnect() {
 	await client?.disconnect();
 }
 
-function applyZoneColorToWire(id: ZoneId) {
+function applyZoneToWire(id: ZoneId) {
 	const z = controls.zones[id];
-	sendCoalesced('color', cmd.setColor(z.color.r, z.color.g, z.color.b, z.brightness));
+	if (z.mode === 'warmwhite') {
+		// Warm-white is a separate hardware channel; the kit ignores RGB while
+		// this command drives the warm LEDs at the given intensity.
+		sendCoalesced('color', cmd.setWarmWhite(z.brightness));
+	} else if (z.mode === 'color') {
+		sendCoalesced('color', cmd.setColor(z.color.r, z.color.g, z.color.b, z.brightness));
+	}
 }
 
 export async function selectZone(id: ZoneId) {
@@ -235,7 +241,25 @@ export async function setColor(rgb: Rgb) {
 			controls.zones[zone.id].mode = 'color';
 		}
 	}
-	applyZoneColorToWire(controls.activeZone);
+	applyZoneToWire(controls.activeZone);
+	persistSession();
+}
+
+export async function setWarmWhite() {
+	const z = controls.zones[controls.activeZone];
+	z.mode = 'warmwhite';
+	// Mirror the warm-white preview color into RGB state for the swatch.
+	z.color = { r: 255, g: 200, b: 130 };
+	if (controls.activeZone === 'overall') {
+		for (const zone of ZONES) {
+			controls.zones[zone.id].mode = 'warmwhite';
+			controls.zones[zone.id].color = { r: 255, g: 200, b: 130 };
+			controls.zones[zone.id].brightness = z.brightness;
+		}
+	}
+	// Warm-white supersedes mic on the kit; sync UI.
+	if (controls.mic.on) controls.mic.on = false;
+	applyZoneToWire(controls.activeZone);
 	persistSession();
 }
 
@@ -247,7 +271,7 @@ export async function setBrightness(pct: number) {
 			controls.zones[zone.id].brightness = pct;
 		}
 	}
-	if (z.mode === 'color') applyZoneColorToWire(controls.activeZone);
+	if (z.mode === 'color' || z.mode === 'warmwhite') applyZoneToWire(controls.activeZone);
 	persistSession();
 }
 

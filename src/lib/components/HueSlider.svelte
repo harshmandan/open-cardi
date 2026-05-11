@@ -1,20 +1,46 @@
 <script lang="ts">
+	import type { Rgb } from '$lib/protocol/commands';
 	import { hslToRgb, rgbToHex, rgbToHsl } from '$lib/protocol/color';
-	import { controls, setColor } from '$lib/state/controls.svelte';
+	import { controls, setColor, setWarmWhite } from '$lib/state/controls.svelte';
 	import { ICON_HUE } from './icons.svelte';
 
+	// Slider t ∈ [0, 100]. Three discrete regions:
+	//   [0, 5)   → white         (cmd.setColor(255, 255, 255))
+	//   [5, 10)  → warm white    (cmd.setWarmWhite — separate HW channel)
+	//   [10, 100] → hue ramp     (hue 0°→360°, red on both ends)
+	// White and warm-white are flat blocks; sub-position within them doesn't
+	// change the emitted color. Orange falls between t=10 (red) and t=25 (yellow).
+	const WHITE: Rgb = { r: 255, g: 255, b: 255 };
+	const S1 = 5;
+	const S2 = 10;
+
+	function sliderToHueRgb(t: number): Rgb {
+		const h = ((t - S2) / (100 - S2)) * 360;
+		return hslToRgb(h, 1, 0.5);
+	}
+
+	function zoneToSliderT(): number {
+		if (zone.mode === 'warmwhite') return (S1 + S2) / 2;
+		const { r, g, b } = zone.color;
+		if (r === 255 && g === 255 && b === 255) return S1 / 2;
+		const { h } = rgbToHsl({ r, g, b });
+		const hh = h === 0 ? 360 : h;
+		return S2 + (hh / 360) * (100 - S2);
+	}
+
 	const zone = $derived(controls.zones[controls.activeZone]);
-	const storedHue = $derived(rgbToHsl(zone.color).h);
+	const storedT = $derived(zoneToSliderT());
 	const swatch = $derived(rgbToHex(zone.color));
 
 	let dragging = $state<number | null>(null);
-	const value = $derived(dragging ?? storedHue);
+	const value = $derived(dragging ?? storedT);
 
 	function onInput(e: Event) {
-		const t = e.target as HTMLInputElement;
-		const h = Number(t.value);
-		dragging = h;
-		void setColor(hslToRgb(h, 1, 0.5));
+		const t = Number((e.target as HTMLInputElement).value);
+		dragging = t;
+		if (t < S1) void setColor(WHITE);
+		else if (t < S2) void setWarmWhite();
+		else void setColor(sliderToHueRgb(t));
 	}
 
 	function onChange() {
@@ -27,13 +53,13 @@
 	<input
 		type="range"
 		min="0"
-		max="359"
+		max="100"
 		step="any"
 		{value}
 		oninput={onInput}
 		onchange={onChange}
 		class="hue-slider"
-		aria-label="Hue {Math.round(value)}°"
+		aria-label="Color"
 	/>
 	<span
 		class="shrink-0 size-44 border border-foreground/15"
@@ -51,13 +77,17 @@
 		height: 44px;
 		background: linear-gradient(
 			to right,
-			#ff0000,
-			#ffff00,
-			#00ff00,
-			#00ffff,
-			#0000ff,
-			#ff00ff,
-			#ff0000
+			#ffffff 0%,
+			#ffffff 5%,
+			#ffc882 5%,
+			#ffc882 10%,
+			#ff0000 10%,
+			#ffff00 25%,
+			#00ff00 40%,
+			#00ffff 55%,
+			#0000ff 70%,
+			#ff00ff 85%,
+			#ff0000 100%
 		);
 		outline: none;
 		cursor: pointer;
