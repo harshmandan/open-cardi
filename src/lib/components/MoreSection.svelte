@@ -58,7 +58,10 @@
 					{@html ICON_CHEVRON}
 				</button>
 			</div>
-			<div class="mx-auto w-full max-w-720 flex-1 min-h-0 overflow-y-auto flex flex-col gap-16 px-16 pb-16">
+			<div
+				class="mx-auto w-full max-w-720 flex-1 min-h-0 overflow-y-auto flex flex-col gap-16 px-16 pb-16"
+				style="overscroll-behavior: contain;"
+			>
 				<PatternPicker />
 				<MicModeSelector />
 				<ShowAllZonesToggle />

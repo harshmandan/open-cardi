@@ -1,3 +1,9 @@
+html,
+body {
+  /* Disable pull-to-refresh and overscroll bounce on mobile. */
+  overscroll-behavior: none;
+}
+
 * {
   /* Remove tap highlight on button */
   -webkit-tap-highlight-color: transparent !important;
