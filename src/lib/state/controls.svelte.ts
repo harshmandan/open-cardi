@@ -157,12 +157,11 @@ let client: CardiClient | null = null;
 const pendingWrites = new Map<string, Uint8Array>();
 let draining = false;
 
-// The official Cardi Tech Android app caps RGB output to ~10 Hz; the MCU drops
-// frames / flashes black when pushed faster than that. Throttle 'color' writes
-// to a 100 ms floor; other kinds (zone, master, mic, pattern, speed) go through
-// as fast as the GATT queue allows.
-const COLOR_MIN_INTERVAL_MS = 100;
-let lastColorSendAt = 0;
+// The official Cardi Tech Android app caps output to ~10 Hz; the MCU drops
+// frames / flashes when pushed faster than that. Apply a 100 ms floor between
+// every write regardless of kind, since the MCU's processing pace is global.
+const MIN_INTERVAL_MS = 100;
+let lastSendAt = 0;
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
@@ -183,15 +182,14 @@ async function drainWrites() {
 			const [kind, initialPayload] = it.value;
 			let payload = initialPayload;
 
-			if (kind === 'color') {
-				const elapsed = performance.now() - lastColorSendAt;
-				if (elapsed < COLOR_MIN_INTERVAL_MS) {
-					await sleep(COLOR_MIN_INTERVAL_MS - elapsed);
-					// Pick up the freshest color the slider produced while we waited.
-					payload = pendingWrites.get('color') ?? payload;
-				}
-				lastColorSendAt = performance.now();
+			const elapsed = performance.now() - lastSendAt;
+			if (elapsed < MIN_INTERVAL_MS) {
+				await sleep(MIN_INTERVAL_MS - elapsed);
+				// Refresh in case a slider produced a newer payload for this kind
+				// while we were waiting — latest-wins semantics still apply.
+				payload = pendingWrites.get(kind) ?? payload;
 			}
+			lastSendAt = performance.now();
 
 			pendingWrites.delete(kind);
 			try {
