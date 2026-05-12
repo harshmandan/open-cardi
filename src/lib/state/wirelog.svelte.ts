@@ -1,6 +1,6 @@
 import { browser } from '$app/environment';
 
-export type WireLogKind = 'send' | 'recv' | 'state' | 'error';
+export type WireLogKind = 'send' | 'recv' | 'state' | 'error' | 'info';
 
 export type WireLogEntry = {
 	t: number;
@@ -69,6 +69,10 @@ export function logState(state: string) {
 
 export function logError(message: string) {
 	record('error', message);
+}
+
+export function logInfo(message: string) {
+	record('info', message);
 }
 
 function fmt(e: WireLogEntry): string {

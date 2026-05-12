@@ -3,7 +3,7 @@ import { CardiClient, type ConnectionState } from '$lib/ble';
 import * as cmd from '$lib/protocol/commands';
 import { ZONES, type ZoneId, type MicModeId } from '$lib/protocol/constants';
 import { pushError } from '$lib/state/notifications.svelte';
-import { logError, logRecv, logSend, logState } from '$lib/state/wirelog.svelte';
+import { logError, logInfo, logRecv, logSend, logState } from '$lib/state/wirelog.svelte';
 
 export type Rgb = { r: number; g: number; b: number };
 
@@ -157,6 +157,15 @@ let client: CardiClient | null = null;
 const pendingWrites = new Map<string, Uint8Array>();
 let draining = false;
 
+// The official Cardi Tech Android app caps RGB output to ~10 Hz; the MCU drops
+// frames / flashes black when pushed faster than that. Throttle 'color' writes
+// to a 100 ms floor; other kinds (zone, master, mic, pattern, speed) go through
+// as fast as the GATT queue allows.
+const COLOR_MIN_INTERVAL_MS = 100;
+let lastColorSendAt = 0;
+
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 function sendCoalesced(kind: string, bytes: Uint8Array) {
 	if (!client?.connected) return;
 	pendingWrites.set(kind, bytes);
@@ -171,7 +180,19 @@ async function drainWrites() {
 		while (pendingWrites.size > 0 && client?.connected) {
 			const it = pendingWrites.entries().next();
 			if (it.done) break;
-			const [kind, payload] = it.value;
+			const [kind, initialPayload] = it.value;
+			let payload = initialPayload;
+
+			if (kind === 'color') {
+				const elapsed = performance.now() - lastColorSendAt;
+				if (elapsed < COLOR_MIN_INTERVAL_MS) {
+					await sleep(COLOR_MIN_INTERVAL_MS - elapsed);
+					// Pick up the freshest color the slider produced while we waited.
+					payload = pendingWrites.get('color') ?? payload;
+				}
+				lastColorSendAt = performance.now();
+			}
+
 			pendingWrites.delete(kind);
 			try {
 				await client.send(payload);
@@ -217,6 +238,12 @@ export async function connect() {
 		const c = ensureClient();
 		await c.connect();
 		controls.deviceName = c.deviceName;
+		// Tell the kit which zone the UI is targeting. Without this the MCU
+		// keeps applying our color writes to whatever zone it had selected
+		// before connect (e.g. doors), so changes appear to land on the
+		// wrong physical strip.
+		logInfo(`zone sync after connect → ${controls.activeZone}`);
+		sendCoalesced('zone', cmd.selectZone(zoneValue(controls.activeZone)));
 	} catch (err) {
 		// requestDevice() rejects with NotFoundError when the user closes the
 		// chooser without picking anything — translate that to plain English.
