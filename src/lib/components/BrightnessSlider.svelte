@@ -8,10 +8,7 @@
 	// rounded value gets stored / displayed.
 	let dragging = $state<number | null>(null);
 	const value = $derived(dragging ?? zone.brightness);
-	// State is clamped to [50, 100] for the wire (low values are visible in the
-	// car but render near-black in the UI). Display 0–100 so the label keeps
-	// its full familiar range.
-	const display = $derived(Math.round((value - 50) * 2));
+	const display = $derived(Math.round(value));
 
 	function onInput(e: Event) {
 		const t = e.target as HTMLInputElement;
@@ -29,7 +26,7 @@
 	<span class="size-16 shrink-0 opacity-70" aria-hidden="true">{@html ICON_BRIGHTNESS}</span>
 	<input
 		type="range"
-		min="50"
+		min="1"
 		max="100"
 		step="any"
 		{value}

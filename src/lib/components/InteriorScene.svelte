@@ -124,6 +124,11 @@
 
 	const visual = $derived(PAGE_VISUALS[pageZone] ?? DEFAULT_VISUAL);
 
+	// UI-only visual floor: the kit looks much brighter at low brightness than
+	// the preview does, so map wire brightness 0-100 → preview opacity 0.5-1.0
+	// (with masterOff still going to 0). The wire value is unchanged.
+	const previewOpacity = (brightness: number) => 0.5 + (Math.max(0, Math.min(100, brightness)) / 100) * 0.5;
+
 	function effective(id: ZoneId) {
 		const z = controls.zones[id];
 		const lighten = (c: number) => Math.round(c + (255 - c) * 0.7);
@@ -134,7 +139,7 @@
 				g: lighten(z.color.g),
 				b: lighten(z.color.b)
 			}),
-			opacity: controls.masterOn ? z.brightness / 100 : 0
+			opacity: controls.masterOn ? previewOpacity(z.brightness) : 0
 		};
 	}
 

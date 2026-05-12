@@ -20,18 +20,6 @@ export type Favorite = {
 	brightness: number;
 };
 
-// The car's lower brightness range is perceptually still bright while the UI
-// preview goes near-black; cap the floor so what the user sees roughly tracks
-// what the car looks like.
-const MIN_BRIGHTNESS = 50;
-
-const clampBrightness = (pct: number) => Math.max(MIN_BRIGHTNESS, Math.min(100, pct));
-
-const normalizeZone = (z: ZoneState): ZoneState => ({
-	...z,
-	brightness: clampBrightness(z.brightness)
-});
-
 const initialZone = (): ZoneState => ({
 	mode: 'color',
 	color: { r: 0, g: 0, b: 0 },
@@ -117,10 +105,7 @@ export const controls = $state({
 		mode: (session.mic?.mode ?? 0) as MicModeId
 	},
 	zones: Object.fromEntries(
-		ZONES.map((z) => {
-			const restored = restoredZones?.[z.id];
-			return [z.id, restored ? normalizeZone(restored) : initialZone()];
-		})
+		ZONES.map((z) => [z.id, restoredZones?.[z.id] ?? initialZone()])
 	) as Record<ZoneId, ZoneState>,
 	favorites: loadFavorites(),
 	moreOpen: session.moreOpen ?? false,
@@ -317,7 +302,7 @@ export async function setWarmWhite() {
 }
 
 export async function setBrightness(pct: number) {
-	const clamped = clampBrightness(pct);
+	const clamped = Math.max(0, Math.min(100, pct));
 	const z = controls.zones[controls.activeZone];
 	z.brightness = clamped;
 	if (controls.activeZone === 'overall') {
