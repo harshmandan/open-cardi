@@ -142,6 +142,13 @@ let client: CardiClient | null = null;
 const pendingWrites = new Map<string, Uint8Array>();
 let draining = false;
 
+// Wire evidence from captures/session-{1,2,3}-*.log shows the official Cardi
+// Tech app uses ATT Write Command (0x52, Write-Without-Response) for *every*
+// data write — color, master, zone, handshake queries — across thousands of
+// frames. Only CCCD descriptor writes use Write Request (0x12). So we mirror
+// that and use writeValueWithoutResponse for everything.
+const WITH_RESPONSE_KINDS = new Set<string>();
+
 // The official Cardi Tech Android app caps output to ~10 Hz; the MCU drops
 // frames / flashes when pushed faster than that. Apply a 100 ms floor between
 // every write regardless of kind, since the MCU's processing pace is global.
@@ -155,6 +162,19 @@ function sendCoalesced(kind: string, bytes: Uint8Array) {
 	pendingWrites.set(kind, bytes);
 	if (draining) return;
 	void drainWrites();
+}
+
+// Probe the device for a state notify shortly after the last color write. The
+// timer resets on every color write so a slider drag only triggers one probe
+// at the end. Surfaces any uncatalogued reply frame in the wirelog and gives
+// the firmware a no-op ACK opportunity that may flush its NVRAM commit.
+let colorProbeTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleColorProbe() {
+	if (colorProbeTimer) clearTimeout(colorProbeTimer);
+	colorProbeTimer = setTimeout(() => {
+		colorProbeTimer = null;
+		if (client?.connected) sendCoalesced('probe', cmd.getLightData());
+	}, 600);
 }
 
 async function drainWrites() {
@@ -178,7 +198,8 @@ async function drainWrites() {
 
 			pendingWrites.delete(kind);
 			try {
-				await client.send(payload);
+				await client.send(payload, { withResponse: WITH_RESPONSE_KINDS.has(kind) });
+				if (kind === 'color') scheduleColorProbe();
 			} catch (err) {
 				pushError(err instanceof Error ? err.message : String(err));
 			}
@@ -202,6 +223,7 @@ function ensureClient(): CardiClient {
 		onNotify: (data) => {
 			controls.lastNotify = data;
 			logRecv(data);
+			applyNotifyToState(data);
 		},
 		onError: (err) => {
 			logError(err.message);
@@ -216,17 +238,47 @@ function ensureClient(): CardiClient {
 
 const zoneValue = (id: ZoneId): number => ZONES.find((z) => z.id === id)?.value ?? 1;
 
+// Parse the notify frames documented in captures/PROTOCOL_v1.md and reflect
+// device-side state back into the local controls store. Only frames whose
+// semantics we've decoded get mapped — unknown shapes still land in the
+// wirelog via logRecv so we can spot uncatalogued reply patterns. The kit
+// does not echo RGB/brightness/pattern in any notify, so those continue to
+// live in restored local state.
+function applyNotifyToState(data: Uint8Array) {
+	// 33 ?? F0/0F 34 — master on/off readback (reply to getLightData)
+	if (data.length === 4 && data[0] === 0x33 && data[3] === 0x34) {
+		const next = data[2] === 0xf0;
+		if (controls.masterOn !== next) {
+			controls.masterOn = next;
+			persistSession();
+			logInfo(`sync master ← device: ${next ? 'on' : 'off'}`);
+		}
+		return;
+	}
+	// 0B XX YY B0 — zone readback. YY=0xA1 means "newmod" (zone selector
+	// active); XX is the currently-selected zone. We map XX to a ZoneId.
+	if (data.length === 4 && data[0] === 0x0b && data[3] === 0xb0) {
+		const zoneVal = data[1];
+		const zone = ZONES.find((z) => z.value === zoneVal);
+		if (zone && controls.activeZone !== zone.id) {
+			controls.activeZone = zone.id;
+			persistSession();
+			logInfo(`sync zone ← device: ${zone.id} (${zoneVal})`);
+		}
+		return;
+	}
+}
+
 export async function connect() {
 	try {
 		const c = ensureClient();
 		await c.connect();
 		controls.deviceName = c.deviceName;
-		// Tell the kit which zone the UI is targeting. Without this the MCU
-		// keeps applying our color writes to whatever zone it had selected
-		// before connect (e.g. doors), so changes appear to land on the
-		// wrong physical strip.
-		logInfo(`zone sync after connect → ${controls.activeZone}`);
-		sendCoalesced('zone', cmd.selectZone(zoneValue(controls.activeZone)));
+		// The handshake just queried master/zone/XF state; replies arrive as
+		// notifies and applyNotifyToState reflects them into the local store.
+		// We deliberately do NOT push our local zone outward — the device's
+		// last-known zone wins, so the UI matches the physical kit instead of
+		// overwriting it with whatever the user had selected last session.
 	} catch (err) {
 		// requestDevice() rejects with NotFoundError when the user closes the
 		// chooser without picking anything — translate that to plain English.

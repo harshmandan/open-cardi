@@ -59,8 +59,25 @@ export function logSend(bytes: Uint8Array) {
 	record('send', inferLabel(bytes), hex(bytes));
 }
 
+function inferRecvLabel(bytes: Uint8Array): string {
+	if (bytes.length === 0) return 'notify_empty';
+	const a = bytes[0];
+	const last = bytes[bytes.length - 1];
+	if (bytes.length === 4 && a === 0x33 && last === 0x34) return 'notify_master';
+	if (bytes.length === 4 && a === 0x0b && last === 0xb0) return 'notify_zone';
+	if (bytes.length === 3 && a === 0x18 && last === 0x81) return 'notify_xftime';
+	if (bytes.length === 4 && a === 0x17 && last === 0x71) return 'notify_xfstate';
+	if (bytes.length === 4 && a === 0x16 && last === 0x61) return 'notify_jhstate';
+	if (bytes.length === 3 && a === 0x39 && last === 0x93) return 'notify_xsrj';
+	if (bytes.length === 18 && a === 0xf9 && last === 0xf8) return 'notify_aes';
+	if (bytes.length === 8 && a === 0x0c) return 'notify_car';
+	// 130-byte all-FF "ready" marker the chip emits after CCCD subscribe.
+	if (bytes.length >= 100 && bytes.every((x) => x === 0xff)) return 'notify_ready';
+	return 'notify_unknown';
+}
+
 export function logRecv(bytes: Uint8Array) {
-	record('recv', 'notify', hex(bytes));
+	record('recv', inferRecvLabel(bytes), hex(bytes));
 }
 
 export function logState(state: string) {

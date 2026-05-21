@@ -76,3 +76,10 @@ export function fragranceOn(): Uint8Array {
 export function fragranceOff(): Uint8Array {
 	return new Uint8Array([0xf8, 0x0f, 0x8f]);
 }
+
+// 4-byte query that triggers a master-state notify (33 ?? ?? 34). Used as a
+// probe after color writes to surface any uncatalogued reply frames the kit
+// might emit, and as part of the connect handshake.
+export function getLightData(): Uint8Array {
+	return new Uint8Array([0x3c, 0xaa, 0xaa, 0x3d]);
+}

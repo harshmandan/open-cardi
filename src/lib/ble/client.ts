@@ -110,14 +110,18 @@ export class CardiClient {
 		this.setState('disconnected');
 	}
 
-	async send(payload: Uint8Array): Promise<void> {
+	async send(payload: Uint8Array, opts: { withResponse?: boolean } = {}): Promise<void> {
 		if (!this.writeChar) throw new Error('not connected');
 		const w = this.writeChar;
 		this.events.onSend?.(payload);
-		const next = this.writeTail.then(
-			() => w.writeValueWithoutResponse(payload as BufferSource),
-			() => w.writeValueWithoutResponse(payload as BufferSource)
-		);
+		// FFE2 on the K3 only advertises WRITE_WITHOUT_RESPONSE — captures show
+		// the official app exclusively sends ATT Write Command (0x52). The
+		// withResponse option exists for future characteristics that might need
+		// it (e.g. CCCD descriptor writes are handled separately by Web BT).
+		const writeFn = opts.withResponse
+			? () => w.writeValue(payload as BufferSource)
+			: () => w.writeValueWithoutResponse(payload as BufferSource);
+		const next = this.writeTail.then(writeFn, writeFn);
 		this.writeTail = next.catch(() => undefined);
 		await next;
 	}
