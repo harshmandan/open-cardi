@@ -10,7 +10,7 @@ A beautiful web-app replacement for the **Cardi Tech** Android app ([`com.qc.xq`
 
 <img src="./static/preview.png" alt="app-preview" width="600" />
 
-- Website: **[opencardi.vercel.app](https://opencardi.vercel.app)**
+- Website: **[opencardi.harsh.ink](https://opencardi.harsh.ink)**
 - Writeup: [Reverse-engineering the Cardi Tech BLE protocol](https://harsh.ink/blog/reverse-engineering-cardi-tech)
 
 ## How it works
@@ -19,15 +19,15 @@ The kit's MCU is a Beken BK343x exposing a single GATT service (`0xFFF0`) with a
 
 Decoded ops (from APK decompile + HCI snoop replay):
 
-| op | wire | use |
-|---|---|---|
-| color | `ED 49 R G B E9` | RGB × brightness, pre-multiplied client-side |
-| master on / off | `ED F0 …` / `ED 0F …` | global kill switch |
-| zone select | `FE z EF` | scopes the next color/pattern to one zone (1..8) |
-| pattern | `ED <Mods[i]> 00 00 00 E9` | 23 presets, opcodes table-driven from `Mods[]` |
-| speed | `30 s 03` | 1..100, applies to current pattern |
-| mic | `ED 34 m m m E9` / `ED 33 …` | 4 reactive modes (Classic / Soft / Jump / Dance) |
-| app mode | `FA 01/02 AF` | Classic vs Starlight rendering on the MCU |
+| op              | wire                         | use                                              |
+| --------------- | ---------------------------- | ------------------------------------------------ |
+| color           | `ED 49 R G B E9`             | RGB × brightness, pre-multiplied client-side     |
+| master on / off | `ED F0 …` / `ED 0F …`        | global kill switch                               |
+| zone select     | `FE z EF`                    | scopes the next color/pattern to one zone (1..8) |
+| pattern         | `ED <Mods[i]> 00 00 00 E9`   | 23 presets, opcodes table-driven from `Mods[]`   |
+| speed           | `30 s 03`                    | 1..100, applies to current pattern               |
+| mic             | `ED 34 m m m E9` / `ED 33 …` | 4 reactive modes (Classic / Soft / Jump / Dance) |
+| app mode        | `FA 01/02 AF`                | Classic vs Starlight rendering on the MCU        |
 
 The `CardiClient` (`src/lib/ble/client.ts`) does a tiny handshake replay on connect, then everything else is fire-and-forget writes — no ACKs, no flow control. State is mirrored locally so reconnects can re-apply the last snapshot.
 
