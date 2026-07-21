@@ -102,6 +102,7 @@ function fmt(e: WireLogEntry): string {
 export function exportLog(): string {
 	const header = [
 		`open-cardi BLE wire log`,
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient timestamp for the header string
 		`exported: ${new Date().toISOString()}`,
 		`entries: ${buffer.length}`,
 		`useragent: ${browser ? navigator.userAgent : 'n/a'}`,
@@ -117,6 +118,7 @@ export function downloadLog() {
 	const url = URL.createObjectURL(blob);
 	const a = document.createElement('a');
 	a.href = url;
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient timestamp for the download filename
 	a.download = `open-cardi-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
 	document.body.appendChild(a);
 	a.click();

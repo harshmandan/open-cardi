@@ -4,9 +4,7 @@ export function hslToRgb(h: number, s: number, l: number): Rgb {
 	const c = (1 - Math.abs(2 * l - 1)) * s;
 	const hp = (((h % 360) + 360) % 360) / 60;
 	const x = c * (1 - Math.abs((hp % 2) - 1));
-	let r1 = 0,
-		g1 = 0,
-		b1 = 0;
+	let r1: number, g1: number, b1: number;
 	if (hp < 1) [r1, g1, b1] = [c, x, 0];
 	else if (hp < 2) [r1, g1, b1] = [x, c, 0];
 	else if (hp < 3) [r1, g1, b1] = [0, c, x];

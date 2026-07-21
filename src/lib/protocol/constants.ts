@@ -26,7 +26,13 @@ export const HANDSHAKE_WRITES: readonly Uint8Array[] = [
 
 export const ZONES = [
 	{ id: 'overall', label: 'Overall', value: 1, supportedOn: 'all' },
-	{ id: 'guide', label: 'Light Guide', value: 2, supportedOn: 'all', subtitle: 'Front + doors on K3' },
+	{
+		id: 'guide',
+		label: 'Light Guide',
+		value: 2,
+		supportedOn: 'all',
+		subtitle: 'Front + doors on K3'
+	},
 	{ id: 'doors', label: 'Doors', value: 3, supportedOn: 'k4+' },
 	{ id: 'floor', label: 'Floor', value: 4, supportedOn: 'all', subtitle: 'Footwell' },
 	{ id: 'skylight', label: 'Skylight', value: 5, supportedOn: 'k4+' },
@@ -41,11 +47,7 @@ export type ZoneId = (typeof ZONES)[number]['id'];
 // Zones hidden from the main scroll-snap by default. Surfaced via the
 // "Show all zones" toggle in the More sheet for users with kits that
 // expose them (chassis lighting variants on premium SKUs).
-export const ZONES_HIDDEN_BY_DEFAULT: readonly ZoneId[] = [
-	'chassis-strobe',
-	'chassis',
-	'strobe'
-];
+export const ZONES_HIDDEN_BY_DEFAULT: readonly ZoneId[] = ['chassis-strobe', 'chassis', 'strobe'];
 
 export const PATTERNS = [
 	{ index: 0, opcode: 0x35, label: 'Smooth color sweep' },

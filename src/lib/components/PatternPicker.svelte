@@ -11,7 +11,7 @@
 
 <div class="flex flex-col gap-12">
 	<div class="flex items-center justify-between">
-		<span class="text-10 font-500 uppercase tracking-wider opacity-50">Pattern</span>
+		<span class="text-10 font-500 tracking-wider uppercase opacity-50">Pattern</span>
 		<button
 			type="button"
 			role="switch"
@@ -28,10 +28,7 @@
 	</div>
 
 	{#if isPattern}
-		<div
-			class="flex flex-col gap-12"
-			transition:slide={{ duration: 220, easing: cubicOut }}
-		>
+		<div class="flex flex-col gap-12" transition:slide={{ duration: 220, easing: cubicOut }}>
 			<SpeedSlider />
 
 			<div class="grid grid-cols-2 gap-4 sm:grid-cols-3">

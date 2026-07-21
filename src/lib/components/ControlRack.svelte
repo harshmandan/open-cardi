@@ -29,7 +29,7 @@
 					<button
 						type="button"
 						onclick={toggleMore}
-						class="flex-1 min-w-0 border border-foreground/15 px-12 py-12 text-left text-12 font-500 uppercase tracking-wider truncate hover:bg-foreground/5"
+						class="min-w-0 flex-1 truncate border border-foreground/15 px-12 py-12 text-left text-12 font-500 tracking-wider uppercase hover:bg-foreground/5"
 					>
 						<span class="opacity-50">Voice ·</span>
 						{micLabel}
@@ -48,7 +48,7 @@
 					<button
 						type="button"
 						onclick={toggleMore}
-						class="flex-1 min-w-0 border border-foreground/15 px-12 py-12 text-left text-12 font-500 uppercase tracking-wider truncate hover:bg-foreground/5"
+						class="min-w-0 flex-1 truncate border border-foreground/15 px-12 py-12 text-left text-12 font-500 tracking-wider uppercase hover:bg-foreground/5"
 					>
 						<span class="opacity-50">Pattern ·</span>
 						{patternLabel}
@@ -77,16 +77,12 @@
 			onclick={toggleMore}
 			disabled={!controls.masterOn}
 			class={[
-				'more-btn flex flex-1 items-center justify-center gap-8 px-12 text-12 font-500 uppercase tracking-wider transition-colors',
-				controls.masterOn ? 'hover:bg-foreground/5' : 'opacity-40 cursor-not-allowed'
+				'more-btn flex flex-1 items-center justify-center gap-8 px-12 text-12 font-500 tracking-wider uppercase transition-colors',
+				controls.masterOn ? 'hover:bg-foreground/5' : 'cursor-not-allowed opacity-40'
 			]}
 		>
 			<span>{controls.moreOpen ? 'Hide' : 'More'}</span>
-			<span
-				class="chevron size-12 opacity-70"
-				class:open={controls.moreOpen}
-				aria-hidden="true"
-			>
+			<span class="chevron size-12 opacity-70" class:open={controls.moreOpen} aria-hidden="true">
 				{@html ICON_CHEVRON}
 			</span>
 		</button>
@@ -97,10 +93,10 @@
 			aria-label="Master power"
 			aria-pressed={controls.masterOn}
 			class={[
-				'master-btn shrink-0 size-44 flex items-center justify-center border transition-colors',
+				'master-btn flex size-44 shrink-0 items-center justify-center border transition-colors',
 				controls.masterOn
-					? 'bg-green/15 text-green border-foreground/15'
-					: 'bg-background text-red/70 border-foreground/15'
+					? 'border-foreground/15 bg-green/15 text-green'
+					: 'border-foreground/15 bg-background text-red/70'
 			]}
 		>
 			<span class="size-20">{@html ICON_POWER}</span>

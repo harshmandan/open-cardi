@@ -19,7 +19,7 @@
 		target="_blank"
 		rel="noopener noreferrer"
 		aria-label="Star on GitHub"
-		class="flex shrink-0 items-center gap-8 border border-foreground/15 px-10 py-6 text-16 font-500 hover:bg-foreground/5"
+		class="text-16 flex shrink-0 items-center gap-8 border border-foreground/15 px-10 py-6 font-500 hover:bg-foreground/5"
 	>
 		<span>star on</span>
 		<span class="size-14">{@html ICON_GITHUB}</span>

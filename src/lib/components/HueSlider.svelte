@@ -62,7 +62,7 @@
 		aria-label="Color"
 	/>
 	<span
-		class="shrink-0 size-44 border border-foreground/15"
+		class="size-44 shrink-0 border border-foreground/15"
 		style:background-color={swatch}
 		aria-hidden="true"
 	></span>

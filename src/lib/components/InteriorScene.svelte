@@ -127,7 +127,8 @@
 	// UI-only visual floor: the kit looks much brighter at low brightness than
 	// the preview does, so map wire brightness 0-100 → preview opacity 0.5-1.0
 	// (with masterOff still going to 0). The wire value is unchanged.
-	const previewOpacity = (brightness: number) => 0.5 + (Math.max(0, Math.min(100, brightness)) / 100) * 0.5;
+	const previewOpacity = (brightness: number) =>
+		0.5 + (Math.max(0, Math.min(100, brightness)) / 100) * 0.5;
 
 	function effective(id: ZoneId) {
 		const z = controls.zones[id];
@@ -172,13 +173,7 @@
 					<stop offset="25%" stop-color={blobFx.color} stop-opacity="1" />
 					<stop offset="100%" stop-color={blobFx.color} stop-opacity="0" />
 				</radialGradient>
-				<filter
-					id="blob-glow-{pageZone}"
-					x="-50%"
-					y="-50%"
-					width="200%"
-					height="200%"
-				>
+				<filter id="blob-glow-{pageZone}" x="-50%" y="-50%" width="200%" height="200%">
 					<feGaussianBlur stdDeviation="2" />
 				</filter>
 			</defs>
@@ -193,12 +188,7 @@
 		{/if}
 
 		{#if visual.glows && visual.glows.length > 0}
-			<svg
-				class="glow-svg"
-				viewBox={visual.viewBox}
-				preserveAspectRatio="none"
-				aria-hidden="true"
-			>
+			<svg class="glow-svg" viewBox={visual.viewBox} preserveAspectRatio="none" aria-hidden="true">
 				<defs>
 					<!--
 						Stroke glow filter: generous filter region in userSpaceOnUse so
@@ -240,13 +230,7 @@
 						     to soften the side edges + screen blend so the color tints
 						     the photo instead of painting over it. -->
 						<defs>
-							<linearGradient
-								id="fill-grad-{pageZone}-{i}"
-								x1="0"
-								y1="0"
-								x2="0"
-								y2="1"
-							>
+							<linearGradient id="fill-grad-{pageZone}-{i}" x1="0" y1="0" x2="0" y2="1">
 								<stop offset="0%" stop-color={fx.color} stop-opacity="1" />
 								<stop offset="100%" stop-color={fx.color} stop-opacity="0" />
 							</linearGradient>
@@ -337,7 +321,10 @@
 		pointer-events: none;
 	}
 	.glow-svg path {
-		transition: stroke 200ms ease-out, opacity 200ms ease-out, fill 200ms ease-out;
+		transition:
+			stroke 200ms ease-out,
+			opacity 200ms ease-out,
+			fill 200ms ease-out;
 		mix-blend-mode: screen;
 	}
 	.fill-glow {
@@ -368,12 +355,20 @@
 		animation: blob-c2 7.5s ease-in-out 0.8s infinite alternate;
 	}
 	@keyframes blob-c1 {
-		from { transform: scale(0.9); }
-		to { transform: scale(1.3); }
+		from {
+			transform: scale(0.9);
+		}
+		to {
+			transform: scale(1.3);
+		}
 	}
 	@keyframes blob-c2 {
-		from { transform: scale(0.7); }
-		to { transform: scale(1.2); }
+		from {
+			transform: scale(0.7);
+		}
+		to {
+			transform: scale(1.2);
+		}
 	}
 	@media (prefers-reduced-motion: reduce) {
 		.blob-c1,

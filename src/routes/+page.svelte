@@ -27,9 +27,9 @@
 	<div class="main">
 		<Header />
 
-		<main class="flex-1 min-h-0 flex flex-col">
+		<main class="flex min-h-0 flex-1 flex-col">
 			<ZonePages />
-			<div class="shrink-0 controls-pad anim-enter anim-enter-2">
+			<div class="controls-pad anim-enter anim-enter-2 shrink-0">
 				<ControlRack />
 			</div>
 		</main>

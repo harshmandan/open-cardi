@@ -31,7 +31,7 @@
 		class="speed-slider"
 		aria-label="Pattern speed {display}"
 	/>
-	<span class="text-12 font-500 tabular-nums opacity-70 shrink-0 w-36 text-right">
+	<span class="w-36 shrink-0 text-right text-12 font-500 tabular-nums opacity-70">
 		{display}
 	</span>
 </div>

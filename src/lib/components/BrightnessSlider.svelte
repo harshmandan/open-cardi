@@ -36,7 +36,7 @@
 		aria-label="Brightness {display}%"
 	/>
 	<span
-		class="brightness-num flex items-center justify-center border border-foreground text-12 font-500 tabular-nums shrink-0"
+		class="brightness-num flex shrink-0 items-center justify-center border border-foreground text-12 font-500 tabular-nums"
 		style:background-color={`rgb(255 255 255 / ${display / 5}%)`}
 	>
 		{display}%

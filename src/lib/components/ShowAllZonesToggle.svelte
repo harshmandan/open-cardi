@@ -3,7 +3,7 @@
 </script>
 
 <div class="flex items-center justify-between">
-	<span class="text-10 font-500 uppercase tracking-wider opacity-50">Show all zones</span>
+	<span class="text-10 font-500 tracking-wider uppercase opacity-50">Show all zones</span>
 	<button
 		type="button"
 		role="switch"

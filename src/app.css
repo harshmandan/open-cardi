@@ -1,15 +1,15 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Linear scale — https://github.com/harshmandan/tailwind-linear-scale */
-@import "./styles/spacing.css";
-@import "./styles/radius.css";
-@import "./styles/breakpoints.css";
-@import "./styles/typography.css";
+@import './styles/spacing.css';
+@import './styles/radius.css';
+@import './styles/breakpoints.css';
+@import './styles/typography.css';
 
 /* Config */
-@import "./styles/root.css";
-@import "./styles/colors.css";
-@import "./styles/custom.css";
+@import './styles/root.css';
+@import './styles/colors.css';
+@import './styles/custom.css';
 
 /* Plugins */
-@plugin "@tailwindcss/forms";
+@plugin '@tailwindcss/forms';

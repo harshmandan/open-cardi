@@ -7,7 +7,7 @@
 
 <div class="flex flex-col gap-12">
 	<div class="flex items-center justify-between">
-		<span class="text-10 font-500 uppercase tracking-wider opacity-50">Voice / mic</span>
+		<span class="text-10 font-500 tracking-wider uppercase opacity-50">Voice / mic</span>
 		<button
 			type="button"
 			role="switch"

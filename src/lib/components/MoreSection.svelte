@@ -12,29 +12,17 @@
 	let { mode = 'sheet' }: { mode?: 'sheet' | 'sidebar' } = $props();
 </script>
 
-<style>
-	.chevron-down {
-		display: inline-flex;
-		transform: rotate(90deg);
-	}
-	/* Extra breathing room below Credits on the mobile sheet, lifted clear of
-	   any iOS safe-area inset so the last item never sits under the home bar. */
-	.sheet-pad-bottom {
-		padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
-	}
-</style>
-
 {#if mode === 'sidebar'}
 	{#if controls.moreOpen}
 		<aside
-			class="flex h-full w-full flex-col gap-20 bg-background p-16 overflow-y-auto"
+			class="flex h-full w-full flex-col gap-20 overflow-y-auto bg-background p-16"
 			transition:fly={{ x: 300, duration: 250, easing: cubicOut }}
 		>
 			<PatternPicker />
 			<MicModeSelector />
 			<ShowAllZonesToggle />
 			<div class="flex items-center justify-between">
-				<span class="text-10 font-500 uppercase tracking-wider opacity-50">BLE wire log</span>
+				<span class="text-10 font-500 tracking-wider uppercase opacity-50">BLE wire log</span>
 				<button
 					type="button"
 					onclick={downloadLog}
@@ -48,11 +36,7 @@
 		</aside>
 	{/if}
 {:else if controls.moreOpen}
-	<div
-		class="fixed inset-0 z-50 flex items-end"
-		role="dialog"
-		aria-modal="true"
-	>
+	<div class="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true">
 		<button
 			type="button"
 			aria-label="Close"
@@ -62,10 +46,10 @@
 		></button>
 
 		<div
-			class="relative w-full max-h-[80dvh] bg-background border-t border-foreground/10 flex flex-col"
+			class="relative flex max-h-[80dvh] w-full flex-col border-t border-foreground/10 bg-background"
 			transition:fly={{ y: 400, duration: 220, easing: cubicOut }}
 		>
-			<div class="mx-auto w-full max-w-720 shrink-0 flex items-center justify-center p-16">
+			<div class="max-w-720 mx-auto flex w-full shrink-0 items-center justify-center p-16">
 				<button
 					type="button"
 					onclick={toggleMore}
@@ -76,14 +60,14 @@
 				</button>
 			</div>
 			<div
-				class="mx-auto w-full max-w-720 flex-1 min-h-0 overflow-y-auto flex flex-col gap-16 px-16 sheet-pad-bottom"
+				class="max-w-720 sheet-pad-bottom mx-auto flex min-h-0 w-full flex-1 flex-col gap-16 overflow-y-auto px-16"
 				style="overscroll-behavior: contain;"
 			>
 				<PatternPicker />
 				<MicModeSelector />
 				<ShowAllZonesToggle />
 				<div class="flex items-center justify-between">
-					<span class="text-10 font-500 uppercase tracking-wider opacity-50">BLE wire log</span>
+					<span class="text-10 font-500 tracking-wider uppercase opacity-50">BLE wire log</span>
 					<button
 						type="button"
 						onclick={downloadLog}
@@ -98,3 +82,15 @@
 		</div>
 	</div>
 {/if}
+
+<style>
+	.chevron-down {
+		display: inline-flex;
+		transform: rotate(90deg);
+	}
+	/* Extra breathing room below Credits on the mobile sheet, lifted clear of
+	   any iOS safe-area inset so the last item never sits under the home bar. */
+	.sheet-pad-bottom {
+		padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+	}
+</style>

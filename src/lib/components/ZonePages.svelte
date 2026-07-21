@@ -5,9 +5,7 @@
 	import { ZONES, ZONES_HIDDEN_BY_DEFAULT, type ZoneId } from '$lib/protocol/constants';
 
 	const visibleZones = $derived(
-		controls.showAllZones
-			? ZONES
-			: ZONES.filter((z) => !ZONES_HIDDEN_BY_DEFAULT.includes(z.id))
+		controls.showAllZones ? ZONES : ZONES.filter((z) => !ZONES_HIDDEN_BY_DEFAULT.includes(z.id))
 	);
 
 	let scroller: HTMLDivElement;
@@ -44,7 +42,8 @@
 
 	// Re-observe pages whenever the visible zone list changes (toggle show-all).
 	$effect(() => {
-		visibleZones; // dependency
+		// eslint-disable-next-line @typescript-eslint/no-unused-expressions -- read to register $effect dependency
+		visibleZones;
 		if (!scroller) return;
 		const observer = new IntersectionObserver(
 			(entries) => {
@@ -64,7 +63,7 @@
 	});
 </script>
 
-<div class="zone-pages flex flex-col flex-1 min-h-0">
+<div class="zone-pages flex min-h-0 flex-1 flex-col">
 	<div class="zone-frame anim-enter anim-enter-1">
 		<div class="zone-subtext">Zone</div>
 		<div class="title-bar">
@@ -87,7 +86,7 @@
 		{#each visibleZones as zone (zone.id)}
 			<section data-zone={zone.id} class="zone-page">
 				<div class="hero">
-					<div class="anim-enter anim-enter-1 w-full flex justify-center">
+					<div class="anim-enter anim-enter-1 flex w-full justify-center">
 						<InteriorScene pageZone={zone.id} />
 					</div>
 				</div>

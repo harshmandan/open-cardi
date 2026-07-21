@@ -53,7 +53,7 @@
 <div class="flex items-center gap-12">
 	<span class="size-16 shrink-0 opacity-70" aria-hidden="true">{@html ICON_STAR}</span>
 	<div
-		class="flex flex-1 min-w-0 items-center gap-8 overflow-x-auto py-4 hide-scrollbar"
+		class="hide-scrollbar flex min-w-0 flex-1 items-center gap-8 overflow-x-auto py-4"
 		style="margin-right: -16px;"
 	>
 		<button
@@ -147,8 +147,14 @@
 		animation: fill-red 3s ease-in forwards;
 	}
 	@keyframes fill-red {
-		0% { opacity: 0; }
-		66.6667% { opacity: 1; }
-		100% { opacity: 1; }
+		0% {
+			opacity: 0;
+		}
+		66.6667% {
+			opacity: 1;
+		}
+		100% {
+			opacity: 1;
+		}
 	}
 </style>

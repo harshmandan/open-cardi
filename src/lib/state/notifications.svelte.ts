@@ -12,6 +12,7 @@ const AUTO_DISMISS_MS = 5000;
 
 export const notifications = $state<{ list: Notification[] }>({ list: [] });
 
+// eslint-disable-next-line svelte/prefer-svelte-reactivity -- setTimeout handles for auto-dismiss, not reactive state
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function nextId(): string {

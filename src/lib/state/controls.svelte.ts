@@ -139,6 +139,7 @@ let client: CardiClient | null = null;
 // and on Android the overflow surfaces as "GATT operation in progress" and
 // drops the link. We keep one pending payload per command kind and only drain
 // the freshest value once the prior write completes.
+// eslint-disable-next-line svelte/prefer-svelte-reactivity -- internal write-coalescer, not reactive state
 const pendingWrites = new Map<string, Uint8Array>();
 let draining = false;
 
