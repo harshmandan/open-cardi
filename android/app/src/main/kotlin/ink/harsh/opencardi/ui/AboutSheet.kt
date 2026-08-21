@@ -3,13 +3,16 @@
 package ink.harsh.opencardi.ui
 
 import android.content.Intent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Code
 import androidx.compose.material3.Icon
@@ -17,12 +20,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import ink.harsh.opencardi.BuildConfig
+import ink.harsh.opencardi.R
 
 private const val REPO_URL = "https://github.com/harshmandan/open-cardi"
 
@@ -30,7 +37,21 @@ private const val REPO_URL = "https://github.com/harshmandan/open-cardi"
 fun AboutSheet() {
 	val context = LocalContext.current
 
-	Text("open-cardi", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+	Row(verticalAlignment = Alignment.CenterVertically) {
+		Image(
+			painter = painterResource(R.drawable.logo),
+			contentDescription = null,
+			modifier = Modifier
+				.size(52.dp)
+				.clip(RoundedCornerShape(14.dp)),
+		)
+		Spacer(Modifier.width(14.dp))
+		Text(
+			"open-cardi",
+			style = MaterialTheme.typography.headlineSmall,
+			fontWeight = FontWeight.Bold,
+		)
+	}
 	Text(
 		"Controls Cardi K3 / K4 and other ConSmart-family ambient light kits over " +
 			"Bluetooth. The protocol was reverse-engineered from scratch — no ads, " +
@@ -42,7 +63,7 @@ fun AboutSheet() {
 	Spacer(Modifier.height(4.dp))
 
 	Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-		InfoRow("Version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+		InfoRow("Version", "v${BuildConfig.VERSION_NAME}")
 		InfoRow("Web app", "opencardi.harsh.ink")
 		InfoRow("License", "MIT")
 	}
@@ -66,7 +87,7 @@ fun AboutSheet() {
 
 @Composable
 private fun InfoRow(label: String, value: String) {
-	androidx.compose.foundation.layout.Row(
+	Row(
 		modifier = Modifier.fillMaxWidth(),
 		horizontalArrangement = Arrangement.SpaceBetween,
 	) {
