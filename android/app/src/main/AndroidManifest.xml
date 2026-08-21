@@ -17,31 +17,48 @@
 
 	<application
 		android:allowBackup="true"
+		android:appCategory="game"
 		android:icon="@mipmap/ic_launcher"
 		android:roundIcon="@mipmap/ic_launcher_round"
 		android:label="@string/app_name"
 		android:supportsRtl="true"
 		android:theme="@android:style/Theme.Material.NoActionBar">
 
+		<!-- CAR_LAUNCHER is what puts a sideloaded app on the head unit. Android
+		     Auto projects this Activity itself rather than drawing templates, so
+		     the car shows the real UI — parked only, the host blocks it in
+		     motion. resizeableActivity and the configChanges list are what let it
+		     survive being handed a second display of a different size. -->
 		<activity
 			android:name=".ui.MainActivity"
-			android:exported="true">
+			android:exported="true"
+			android:resizeableActivity="true"
+			android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode|density|layoutDirection">
 			<intent-filter>
 				<action android:name="android.intent.action.MAIN" />
 				<category android:name="android.intent.category.LAUNCHER" />
+				<category android:name="android.intent.category.DEFAULT" />
+				<category android:name="android.intent.category.CAR_LAUNCHER" />
 			</intent-filter>
 		</activity>
 
-		<!-- Android Auto entry point. IOT is the category for controlling
-		     connected devices from the car. -->
-		<service
-			android:name=".car.CardiCarAppService"
-			android:exported="true">
-			<intent-filter>
-				<action android:name="androidx.car.app.CarAppService" />
-				<category android:name="androidx.car.app.category.IOT" />
-			</intent-filter>
-		</service>
+		<!-- The template car app (car/CardiCarAppService.kt) is deliberately NOT
+		     declared. A template CarAppService and a projected Activity are
+		     mutually exclusive and the host prefers the service, logging
+
+		       GH.AvailableAppFinder: Skipping ProjectionApp(...) due to a
+		       conflicting driving optimized app
+
+		     and then denying the service anyway because the package is not from
+		     Play. The car/ package is kept intact for the day this ships on Play,
+		     where the template route works and is usable while driving; nothing
+		     binds it while this declaration is absent. -->
+
+		<!-- Marks the projected UI as safe to draw on a car display. Without it
+		     the host has nothing to check and will not project the Activity. -->
+		<meta-data
+			android:name="distractionOptimized"
+			android:value="true" />
 
 		<meta-data
 			android:name="com.google.android.gms.car.application"
