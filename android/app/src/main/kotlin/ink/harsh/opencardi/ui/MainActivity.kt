@@ -138,13 +138,16 @@ class MainActivity : ComponentActivity() {
 				label = "accent",
 			)
 			OpenCardiTheme(accent) {
-				// UI_MODE_TYPE_CAR is what a projected display reports, so the
-				// same Activity can render a car-appropriate layout on the head
-				// unit and the phone layout in the hand.
-				val onCar = (LocalConfiguration.current.uiMode and
-					Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_CAR
+				// A head unit and a phone held sideways are the same problem —
+				// wide and short — and the portrait layout collapses in both.
+				// UI_MODE_TYPE_CAR is what a projected display reports; the
+				// height check catches landscape everywhere else.
+				val config = LocalConfiguration.current
+				val onCar = (config.uiMode and Configuration.UI_MODE_TYPE_MASK) ==
+					Configuration.UI_MODE_TYPE_CAR
+				val tooShortForPortrait = config.screenHeightDp < 500
 
-				if (onCar) {
+				if (onCar || tooShortForPortrait) {
 					val pinned = state.favorites
 					val seen = (pinned + state.customColors).map { it.color }.toSet()
 					CarLayout(
