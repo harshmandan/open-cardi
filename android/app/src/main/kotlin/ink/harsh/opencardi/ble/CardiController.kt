@@ -26,6 +26,7 @@ object CardiController {
 
 	private var client: CardiClient? = null
 	private var prefs: SharedPreferences? = null
+	private var triedDirectConnect = false
 
 	private const val PREFS = "open-cardi"
 	private const val KEY_ADDRESS = "device-address"
@@ -50,6 +51,13 @@ object CardiController {
 			context = app,
 			scope = scope,
 			onConnection = { connection, device ->
+				// A remembered address that never answers means the kit is not
+				// where we left it — or is not responding at all. Fall back to
+				// a scan once before giving up.
+				if (connection == Connection.DISCONNECTED && triedDirectConnect) {
+					triedDirectConnect = false
+					client?.scanAndConnect()
+				}
 				_state.update {
 					it.copy(
 						connection = connection,
@@ -75,11 +83,23 @@ object CardiController {
 	/** Address of the last kit we connected to, if any. */
 	val rememberedAddress: String? get() = prefs?.getString(KEY_ADDRESS, null)
 
-	/** Reconnect silently if we know the kit, otherwise scan. */
+	/**
+	 * Reconnect silently if we know the kit, otherwise scan.
+	 *
+	 * A direct connect to a remembered address that is not answering burns
+	 * thirty seconds before the stack gives up with GATT_CONNECTION_TIMEOUT, so
+	 * a failure falls back to scanning rather than retrying the same address.
+	 */
 	fun connect() {
 		val c = client ?: return
 		val known = rememberedAddress
-		if (known != null) c.connect(known) else c.scanAndConnect()
+		if (known != null) {
+			triedDirectConnect = true
+			c.connect(known)
+		} else {
+			triedDirectConnect = false
+			c.scanAndConnect()
+		}
 	}
 
 	fun forgetAndRescan() {

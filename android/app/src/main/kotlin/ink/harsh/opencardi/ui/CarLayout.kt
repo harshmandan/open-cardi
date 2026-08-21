@@ -235,12 +235,12 @@ fun CarLayout(
 				VerticalSlider(
 					value = state.brightness.toFloat(),
 					onValueChange = { CardiController.setBrightness(it.roundToInt()) },
-					// 5 to 100 in 5% steps. The floor is 5 rather than 1 because
-					// clean 5% segments cannot land on 1, and the point of a
-					// non-zero floor is that the slider never switches the kit
-					// off — that is what the power button is for.
-					valueRange = 5f..100f,
-					steps = 18,
+					// 1 to 100 in twenty stops: 1, 6, 11 … 100. The floor is 1 so
+					// the slider dims without ever switching the kit off — the
+					// power button does that. Segments come out at ~5.2% rather
+					// than exactly 5, which is the cost of starting at 1.
+					valueRange = 1f..100f,
+					steps = 19,
 					trackWidth = 66.dp,
 					trackHeight = 210.dp,
 					accent = accent,
