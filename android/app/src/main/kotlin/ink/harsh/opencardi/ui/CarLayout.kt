@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonColors
@@ -49,13 +50,17 @@ fun CarLayout(state: CardiState, palette: List<Favorite>) {
 	val zones = Zones.list.filterNot { it.k4Only }
 	val index = zones.indexOfFirst { it.id == state.zoneId }.coerceAtLeast(0)
 
+	Surface(
+		color = MaterialTheme.colorScheme.background,
+		contentColor = MaterialTheme.colorScheme.onBackground,
+		modifier = Modifier.fillMaxSize(),
+	) {
 	Row(
 		modifier = Modifier
 			.fillMaxSize()
-			.background(MaterialTheme.colorScheme.background)
-			.padding(24.dp),
+			.padding(horizontal = 20.dp, vertical = 12.dp),
 		verticalAlignment = Alignment.CenterVertically,
-		horizontalArrangement = Arrangement.spacedBy(24.dp),
+		horizontalArrangement = Arrangement.spacedBy(18.dp),
 	) {
 		// Power: the largest target, always in the same place.
 		ToggleButton(
@@ -63,18 +68,18 @@ fun CarLayout(state: CardiState, palette: List<Favorite>) {
 			onCheckedChange = { CardiController.setMaster(it) },
 			shapes = ToggleButtonShapes(CircleShape, CircleShape, CircleShape),
 			contentPadding = PaddingValues(0.dp),
-			modifier = Modifier.size(140.dp),
+			modifier = Modifier.size(104.dp),
 		) {
 			Icon(
 				Icons.Filled.PowerSettingsNew,
 				contentDescription = "Master power",
-				modifier = Modifier.size(56.dp),
+				modifier = Modifier.size(40.dp),
 			)
 		}
 
 		Column(
 			modifier = Modifier.weight(1f),
-			verticalArrangement = Arrangement.spacedBy(20.dp),
+			verticalArrangement = Arrangement.spacedBy(12.dp),
 		) {
 			// Zone as a stepper, not a swipe: a swipe on a head unit competes
 			// with the host's own gestures.
@@ -88,9 +93,10 @@ fun CarLayout(state: CardiState, palette: List<Favorite>) {
 				}
 				Text(
 					zones[index].label,
-					style = MaterialTheme.typography.headlineMedium,
+					style = MaterialTheme.typography.titleLarge,
 					fontWeight = FontWeight.ExtraBold,
 					textAlign = TextAlign.Center,
+					color = MaterialTheme.colorScheme.onBackground,
 					modifier = Modifier.weight(1f),
 				)
 				CarStep(Icons.Filled.ChevronRight, "Next zone") {
@@ -99,7 +105,7 @@ fun CarLayout(state: CardiState, palette: List<Favorite>) {
 			}
 
 			Row(
-				horizontalArrangement = Arrangement.spacedBy(16.dp),
+				horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally),
 				modifier = Modifier.fillMaxWidth(),
 			) {
 				palette.take(6).forEach { favorite ->
@@ -117,9 +123,7 @@ fun CarLayout(state: CardiState, palette: List<Favorite>) {
 							checkedContentColor = fill,
 						),
 						contentPadding = PaddingValues(0.dp),
-						modifier = Modifier
-							.weight(1f)
-							.height(92.dp),
+						modifier = Modifier.size(60.dp),
 					) {}
 				}
 			}
@@ -127,7 +131,7 @@ fun CarLayout(state: CardiState, palette: List<Favorite>) {
 			// Stepped brightness rather than a slider: dragging a thin track is
 			// the one thing you cannot do on a car screen without looking.
 			Row(
-				horizontalArrangement = Arrangement.spacedBy(16.dp),
+				horizontalArrangement = Arrangement.spacedBy(10.dp),
 				modifier = Modifier.fillMaxWidth(),
 			) {
 				listOf(10, 25, 50, 75, 100).forEach { pct ->
@@ -139,13 +143,14 @@ fun CarLayout(state: CardiState, palette: List<Favorite>) {
 						contentPadding = PaddingValues(0.dp),
 						modifier = Modifier
 							.weight(1f)
-							.height(72.dp),
+							.height(50.dp),
 					) {
-						Text("$pct%", style = MaterialTheme.typography.titleLarge)
+						Text("$pct%", style = MaterialTheme.typography.titleMedium)
 					}
 				}
 			}
 		}
+	}
 	}
 }
 
@@ -157,8 +162,8 @@ private fun CarStep(icon: ImageVector, description: String, onClick: () -> Unit)
 		shapes = squircleShapes(),
 		colors = tileColors(),
 		contentPadding = PaddingValues(0.dp),
-		modifier = Modifier.size(84.dp),
+		modifier = Modifier.size(56.dp),
 	) {
-		Icon(icon, contentDescription = description, modifier = Modifier.size(36.dp))
+		Icon(icon, contentDescription = description, modifier = Modifier.size(26.dp))
 	}
 }
