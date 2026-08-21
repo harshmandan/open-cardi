@@ -253,6 +253,23 @@ class CardiClient(
 			}
 			writeChar = service.getCharacteristic(WRITE_CHARACTERISTIC)
 
+			// captures/PROTOCOL_v1.md records the two sources disagreeing: the
+			// HCI snoop shows the official app using Write Command throughout,
+			// the APK decompile shows colour drags ACK-gated with-response.
+			// Log what the characteristic actually offers so the next session
+			// settles it from the device rather than from the notes.
+			writeChar?.let { c ->
+				val p = c.properties
+				Log.i(
+					WIRE,
+					"FFE2 properties=0x%02X write=%b writeNoResponse=%b".format(
+						p,
+						p and BluetoothGattCharacteristic.PROPERTY_WRITE != 0,
+						p and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0,
+					),
+				)
+			}
+
 			service.getCharacteristic(NOTIFY_CHARACTERISTIC)?.let { notify ->
 				g.setCharacteristicNotification(notify, true)
 				notify.getDescriptor(CCCD)?.let { d ->

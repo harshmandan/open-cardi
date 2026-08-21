@@ -10,6 +10,7 @@ import android.Manifest
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.graphics.RenderEffect as AndroidRenderEffect
+import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -137,6 +138,24 @@ class MainActivity : ComponentActivity() {
 				label = "accent",
 			)
 			OpenCardiTheme(accent) {
+				// UI_MODE_TYPE_CAR is what a projected display reports, so the
+				// same Activity can render a car-appropriate layout on the head
+				// unit and the phone layout in the hand.
+				val onCar = (LocalConfiguration.current.uiMode and
+					Configuration.UI_MODE_TYPE_MASK) == Configuration.UI_MODE_TYPE_CAR
+
+				if (onCar) {
+					val pinned = state.favorites
+					val seen = (pinned + state.customColors).map { it.color }.toSet()
+					CarLayout(
+						state = state,
+						palette = pinned + state.customColors +
+							PALETTE.filterNot { it in seen }
+								.map { Favorite(it, state.brightness) },
+					)
+					return@OpenCardiTheme
+				}
+
 				Screen(
 					state = state,
 					accent = accent,
