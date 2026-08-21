@@ -158,6 +158,7 @@ class MainActivity : ComponentActivity() {
 						palette = pinned + state.customColors +
 							PALETTE.filterNot { it in seen }
 								.map { Favorite(it, state.brightness) },
+						accent = accent,
 						onPatterns = { wideSheet = Sheet.PATTERN },
 						onVoice = { wideSheet = Sheet.VOICE },
 						onConnect = {

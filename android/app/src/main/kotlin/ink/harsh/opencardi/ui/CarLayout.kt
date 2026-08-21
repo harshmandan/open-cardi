@@ -2,21 +2,30 @@
 
 package ink.harsh.opencardi.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothConnected
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -24,51 +33,41 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.ToggleButtonColors
 import androidx.compose.material3.ToggleButtonShapes
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.filled.Bluetooth
-import androidx.compose.material.icons.filled.BluetoothConnected
-import androidx.compose.material.icons.filled.GraphicEq
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.Tune
-import ink.harsh.opencardi.protocol.Patterns
 import ink.harsh.opencardi.ble.CardiController
 import ink.harsh.opencardi.ble.CardiState
 import ink.harsh.opencardi.ble.Favorite
+import ink.harsh.opencardi.protocol.Patterns
 import ink.harsh.opencardi.protocol.Zones
+import kotlin.math.roundToInt
 
 /**
- * What the head unit shows.
+ * The wide layout, used on a head unit and on a phone held sideways.
  *
- * A car display is wide, further from the eye than a phone and touched without
- * looking at it, so this is not the phone layout scaled up: no carousel, no
- * colour wheel, no bottom sheets and no sliders. Every control is a large fixed
- * target laid out left to right, and the only text is the zone name.
+ * Four columns divided by rules: controls, zones, colours, brightness. Nothing
+ * stretches to fill — sizes are fixed and the columns are centred, because a
+ * control inflated to whatever height is left reads as a slab rather than a
+ * button.
  */
 @Composable
 fun CarLayout(
 	state: CardiState,
 	palette: List<Favorite>,
+	accent: Color,
 	onPatterns: () -> Unit,
 	onVoice: () -> Unit,
 	onConnect: () -> Unit,
 ) {
 	val zones = Zones.list.filterNot { it.k4Only }
-	val index = zones.indexOfFirst { it.id == state.zoneId }.coerceAtLeast(0)
 	val pattern = state.patternIndex?.let { Patterns.list.getOrNull(it) }
-	val colors = palette.take(8)
+	val colors = palette.take(9)
 
 	Surface(
 		color = MaterialTheme.colorScheme.background,
@@ -78,118 +77,108 @@ fun CarLayout(
 		Row(
 			modifier = Modifier
 				.fillMaxSize()
-				// This layout was running under the status bar and the gesture
-				// bar; nothing else here matters until it stops doing that.
 				.windowInsetsPadding(WindowInsets.safeDrawing)
-				.padding(horizontal = 16.dp, vertical = 10.dp),
+				.padding(horizontal = 18.dp, vertical = 14.dp),
 			verticalAlignment = Alignment.CenterVertically,
-			horizontalArrangement = Arrangement.spacedBy(14.dp),
+			horizontalArrangement = Arrangement.spacedBy(18.dp),
 		) {
-			// Every control in one column down the left, each taking a share of
-			// the full height rather than sitting in a band.
+			// 1 — controls
 			Column(
-				modifier = Modifier.width(72.dp),
-				verticalArrangement = Arrangement.spacedBy(10.dp),
+				verticalArrangement = Arrangement.spacedBy(14.dp),
+				horizontalAlignment = Alignment.CenterHorizontally,
 			) {
 				ToggleButton(
 					checked = state.masterOn,
 					onCheckedChange = { CardiController.setMaster(it) },
-					shapes = squircleShapes(),
+					shapes = ToggleButtonShapes(CircleShape, CircleShape, CircleShape),
 					contentPadding = PaddingValues(0.dp),
-					modifier = Modifier.size(72.dp),
+					modifier = Modifier.size(58.dp),
 				) {
 					Icon(
 						Icons.Filled.PowerSettingsNew,
 						contentDescription = "Master power",
-						modifier = Modifier.size(30.dp),
+						modifier = Modifier.size(24.dp),
 					)
 				}
-				CarSide(
+				RoundControl(
 					icon = pattern?.let { patternIcon(it) } ?: Icons.Filled.Tune,
 					description = "Patterns",
 					selected = pattern != null,
 					onClick = onPatterns,
-					modifier = Modifier.size(72.dp),
 				)
-				CarSide(
+				RoundControl(
 					icon = if (state.micMode != null) Icons.Filled.GraphicEq else Icons.Filled.Mic,
 					description = "Voice",
 					selected = state.micMode != null,
 					onClick = onVoice,
-					modifier = Modifier.size(72.dp),
 				)
-				ToggleButton(
-					checked = state.isConnected,
-					onCheckedChange = { onConnect() },
-					shapes = pillShapes(),
-					colors = tileColors(),
-					contentPadding = PaddingValues(0.dp),
-					modifier = Modifier
-						.fillMaxWidth()
-						.height(40.dp),
-				) {
-					Icon(
-						if (state.isConnected) Icons.Filled.BluetoothConnected
-						else Icons.Filled.Bluetooth,
-						contentDescription = if (state.isConnected) "Connected" else "Connect",
-						modifier = Modifier.size(18.dp),
-					)
+				RoundControl(
+					icon = if (state.isConnected) Icons.Filled.BluetoothConnected
+					else Icons.Filled.Bluetooth,
+					description = if (state.isConnected) "Disconnect" else "Connect",
+					selected = state.isConnected,
+					onClick = onConnect,
+				)
+			}
+
+			CarRule()
+
+			// 2 — zones, flat buttons that outline in the accent when active
+			Column(
+				verticalArrangement = Arrangement.spacedBy(12.dp),
+				modifier = Modifier.width(150.dp),
+			) {
+				zones.forEach { zone ->
+					val selected = state.zoneId == zone.id
+					ToggleButton(
+						checked = selected,
+						onCheckedChange = { CardiController.selectZone(zone.id) },
+						shapes = pillShapes(),
+						colors = ToggleButtonColors(
+							containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+							contentColor = MaterialTheme.colorScheme.onSurface,
+							disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+							disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+							checkedContainerColor = accent.copy(alpha = 0.14f),
+							checkedContentColor = accent,
+						),
+						border = if (selected)
+							androidx.compose.foundation.BorderStroke(1.5.dp, accent) else null,
+						modifier = Modifier
+							.fillMaxWidth()
+							.height(54.dp),
+					) {
+						Text(
+							zone.label,
+							style = MaterialTheme.typography.titleSmall,
+							fontWeight = FontWeight.SemiBold,
+							maxLines = 1,
+						)
+					}
 				}
 			}
 
-			// Colours as a two-row grid that fills whatever height is left.
-			Column(
-				modifier = Modifier.weight(1f),
-				verticalArrangement = Arrangement.spacedBy(10.dp),
-			) {
-				Row(
-					verticalAlignment = Alignment.CenterVertically,
-					horizontalArrangement = Arrangement.spacedBy(10.dp),
-					modifier = Modifier
-						.fillMaxWidth()
-						.height(46.dp),
-				) {
-					CarStep(Icons.Filled.ChevronLeft, "Previous zone") {
-						CardiController.selectZone(
-							zones[(index - 1 + zones.size) % zones.size].id,
-						)
-					}
-					Column(
-						modifier = Modifier.weight(1f),
-						horizontalAlignment = Alignment.CenterHorizontally,
-					) {
-						Text(
-							zones[index].label,
-							style = MaterialTheme.typography.titleMedium,
-							fontWeight = FontWeight.ExtraBold,
-							textAlign = TextAlign.Center,
-							color = MaterialTheme.colorScheme.onBackground,
-						)
-						Text(
-							pattern?.label ?: "Solid color",
-							style = MaterialTheme.typography.labelSmall,
-							color = MaterialTheme.colorScheme.onSurfaceVariant,
-						)
-					}
-					CarStep(Icons.Filled.ChevronRight, "Next zone") {
-						CardiController.selectZone(zones[(index + 1) % zones.size].id)
-					}
-				}
+			CarRule()
 
-				colors.chunked(4).forEach { row ->
-					Row(
-						horizontalArrangement = Arrangement.spacedBy(10.dp),
-						modifier = Modifier.fillMaxWidth(),
-					) {
+			// 3 — colours, 3x3
+			Column(
+				verticalArrangement = Arrangement.spacedBy(12.dp),
+				horizontalAlignment = Alignment.CenterHorizontally,
+				modifier = Modifier.weight(1f),
+			) {
+				colors.chunked(3).forEach { row ->
+					Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
 						row.forEach { favorite ->
 							val fill =
 								Color(favorite.color.r, favorite.color.g, favorite.color.b)
 							ToggleButton(
 								checked = state.color == favorite.color,
 								onCheckedChange = { CardiController.applyFavorite(favorite) },
-								// A weighted cell cannot stay a circle, so the
-								// swatches are rounded tiles that fill it.
-								shapes = squircleShapes(),
+								shapes = ToggleButtonShapes(
+									CircleShape,
+									CircleShape,
+									CircleShape,
+								),
 								colors = ToggleButtonColors(
 									containerColor = fill,
 									contentColor = fill,
@@ -199,70 +188,71 @@ fun CarLayout(
 									checkedContentColor = fill,
 								),
 								contentPadding = PaddingValues(0.dp),
-								modifier = Modifier
-									.weight(1f)
-									.height(64.dp),
+								modifier = Modifier.size(52.dp),
 							) {}
 						}
-						repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+						repeat(3 - row.size) { Spacer(Modifier.size(52.dp)) }
 					}
 				}
 			}
 
-			// Brightness down the right, same trick.
+			CarRule()
+
+			// 4 — brightness
 			Column(
-				modifier = Modifier.width(84.dp),
-				verticalArrangement = Arrangement.spacedBy(8.dp),
+				horizontalAlignment = Alignment.CenterHorizontally,
+				verticalArrangement = Arrangement.spacedBy(10.dp),
 			) {
-				listOf(100, 75, 50, 25, 10).forEach { pct ->
-					ToggleButton(
-						checked = state.brightness == pct,
-						onCheckedChange = { CardiController.setBrightness(pct) },
-						shapes = squircleShapes(),
-						colors = tileColors(),
-						contentPadding = PaddingValues(0.dp),
-						modifier = Modifier
-							.fillMaxWidth()
-							.height(40.dp),
-					) {
-						Text("$pct%", style = MaterialTheme.typography.labelLarge)
-					}
-				}
+				Icon(
+					Icons.Filled.LightMode,
+					contentDescription = null,
+					tint = MaterialTheme.colorScheme.onSurfaceVariant,
+					modifier = Modifier.size(22.dp),
+				)
+				VerticalSlider(
+					value = state.brightness.toFloat(),
+					onValueChange = { CardiController.setBrightness(it.roundToInt()) },
+					valueRange = 0f..100f,
+					steps = 19,
+					trackWidth = 46.dp,
+					trackHeight = 190.dp,
+					accent = accent,
+				)
+				Text(
+					"${state.brightness}%",
+					style = MaterialTheme.typography.titleSmall,
+					fontWeight = FontWeight.SemiBold,
+				)
 			}
 		}
 	}
 }
 
 @Composable
-private fun CarSide(
+private fun CarRule() {
+	VerticalDivider(
+		modifier = Modifier
+			.fillMaxHeight()
+			.padding(vertical = 6.dp),
+		color = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+	)
+}
+
+@Composable
+private fun RoundControl(
 	icon: ImageVector,
 	description: String,
 	selected: Boolean,
 	onClick: () -> Unit,
-	modifier: Modifier = Modifier,
 ) {
 	ToggleButton(
 		checked = selected,
 		onCheckedChange = { onClick() },
-		shapes = squircleShapes(),
+		shapes = ToggleButtonShapes(CircleShape, CircleShape, CircleShape),
 		colors = tileColors(),
 		contentPadding = PaddingValues(0.dp),
-		modifier = modifier,
+		modifier = Modifier.size(58.dp),
 	) {
-		Icon(icon, contentDescription = description, modifier = Modifier.size(26.dp))
-	}
-}
-
-@Composable
-private fun CarStep(icon: ImageVector, description: String, onClick: () -> Unit) {
-	ToggleButton(
-		checked = false,
-		onCheckedChange = { onClick() },
-		shapes = squircleShapes(),
-		colors = tileColors(),
-		contentPadding = PaddingValues(0.dp),
-		modifier = Modifier.size(56.dp),
-	) {
-		Icon(icon, contentDescription = description, modifier = Modifier.size(26.dp))
+		Icon(icon, contentDescription = description, modifier = Modifier.size(22.dp))
 	}
 }
