@@ -235,12 +235,13 @@ fun CarLayout(
 				VerticalSlider(
 					value = state.brightness.toFloat(),
 					onValueChange = { CardiController.setBrightness(it.roundToInt()) },
-					// 1 to 100 in twenty stops: 1, 6, 11 … 100. The floor is 1 so
-					// the slider dims without ever switching the kit off — the
-					// power button does that. Segments come out at ~5.2% rather
-					// than exactly 5, which is the cost of starting at 1.
+					// Continuous 1..100 so any value is reachable, 2 and 3
+					// included. The floor is 1 so the slider dims without ever
+					// switching the kit off — the power button does that.
+					// Snap stops are gone, and the tick dots with them: Material
+					// only draws a tick where there is a stop to snap to.
 					valueRange = 1f..100f,
-					steps = 19,
+					steps = 0,
 					trackWidth = 66.dp,
 					trackHeight = 210.dp,
 					accent = accent,

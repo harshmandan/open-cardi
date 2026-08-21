@@ -553,10 +553,9 @@ private fun BrightnessRow(pct: Int, accent: Color) {
 		Slider(
 			value = pct.toFloat(),
 			onValueChange = { CardiController.setBrightness(it.roundToInt()) },
-			valueRange = 0f..100f,
-			// 20 stops of 5% — the slider snaps to these, and the track draws
-			// a tick for each one.
-			steps = 19,
+			// Continuous, floored at 1: dimming is not switching off, and
+			// every value in between should be reachable.
+			valueRange = 1f..100f,
 			track = { WavyTrack(it) },
 			modifier = Modifier.weight(1f),
 		)
@@ -831,8 +830,7 @@ private fun CustomColorSheet(startBrightness: Int, onDone: () -> Unit) {
 	Slider(
 		value = brightness.toFloat(),
 		onValueChange = { brightness = it.roundToInt() },
-		valueRange = 0f..100f,
-		steps = 19,
+		valueRange = 1f..100f,
 		colors = SliderDefaults.colors(thumbColor = swatch),
 		track = { BrightnessTrack(it, swatch) },
 	)
