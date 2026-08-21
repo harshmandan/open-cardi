@@ -133,6 +133,9 @@ class MainActivity : ComponentActivity() {
 
 		setContent {
 			val state by CardiController.state.collectAsStateWithLifecycle()
+			// The wide layout returns before Screen()'s own sheet host, so it
+			// carries its own.
+			var wideSheet by remember { mutableStateOf(Sheet.NONE) }
 			val accent by animateColorAsState(
 				Color(state.color.r, state.color.g, state.color.b),
 				label = "accent",
@@ -155,7 +158,19 @@ class MainActivity : ComponentActivity() {
 						palette = pinned + state.customColors +
 							PALETTE.filterNot { it in seen }
 								.map { Favorite(it, state.brightness) },
+						onPatterns = { wideSheet = Sheet.PATTERN },
+						onVoice = { wideSheet = Sheet.VOICE },
+						onConnect = {
+							if (state.isConnected) CardiService.stop(this@MainActivity)
+							else requestPermissions.launch(
+								arrayOf(
+									Manifest.permission.BLUETOOTH_SCAN,
+									Manifest.permission.BLUETOOTH_CONNECT,
+								)
+							)
+						},
 					)
+					WideSheets(state, wideSheet) { wideSheet = Sheet.NONE }
 					return@OpenCardiTheme
 				}
 
@@ -403,6 +418,43 @@ private fun ZoneArea(
 				onPin = onPin,
 				onCustomColor = onCustomColor,
 			)
+		}
+	}
+}
+
+/** Pattern and voice pickers for the wide layout, which has no sheet host. */
+@Composable
+private fun WideSheets(state: CardiState, sheet: Sheet, onDismiss: () -> Unit) {
+	if (sheet == Sheet.NONE) return
+	val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+	val maxSheetHeight = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
+	val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+	ModalBottomSheet(
+		onDismissRequest = onDismiss,
+		sheetState = sheetState,
+		containerColor = MaterialTheme.colorScheme.surfaceContainer,
+		contentWindowInsets = { WindowInsets(0) },
+	) {
+		Box(
+			modifier = Modifier
+				.fillMaxWidth()
+				.heightIn(max = maxSheetHeight)
+				.padding(bottom = navBottom + 24.dp),
+		) {
+			Column(
+				modifier = Modifier
+					.fillMaxWidth()
+					.verticalScroll(rememberScrollState())
+					.padding(horizontal = 24.dp),
+				verticalArrangement = Arrangement.spacedBy(16.dp),
+			) {
+				when (sheet) {
+					Sheet.PATTERN -> PatternSheet(state, onDismiss)
+					Sheet.VOICE -> VoiceSheet(state, onDismiss)
+					else -> Unit
+				}
+			}
 		}
 	}
 }
