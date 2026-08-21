@@ -40,6 +40,23 @@ private const val WIRE = "CardiWire"
 
 private fun hex(bytes: ByteArray) = bytes.joinToString(" ") { "%02X".format(it) }
 
+/**
+ * Android surfaces GATT failures as bare integers. The ones we actually see are
+ * named here so the wire log says why a link dropped instead of "status=8".
+ */
+private fun gattStatus(code: Int): String = when (code) {
+	0 -> "SUCCESS"
+	8 -> "CONN_TIMEOUT (supervision timeout — peer stopped responding)"
+	19 -> "TERMINATE_PEER_USER (the kit hung up)"
+	22 -> "TERMINATE_LOCAL_HOST (the phone hung up)"
+	34 -> "CONN_LMP_TIMEOUT"
+	62 -> "CONN_FAIL_ESTABLISH"
+	133 -> "GATT_ERROR (generic — usually a failed connect)"
+	147 -> "CONN_TERMINATED (147)"
+	257 -> "FAILURE"
+	else -> "status=$code"
+}
+
 /** CCCD — standard descriptor for enabling notifications. */
 private val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
@@ -77,6 +94,8 @@ class CardiClient(
 	private var draining = false
 	private var lastSendAt = 0L
 	private var writeAck: CompletableDeferred<Boolean>? = null
+	private var connectedAt = 0L
+	private var rssiJob: kotlinx.coroutines.Job? = null
 
 	// --- scanning -----------------------------------------------------------
 
@@ -166,6 +185,9 @@ class CardiClient(
 
 	fun disconnect() {
 		stopScan()
+		rssiJob?.cancel()
+		rssiJob = null
+		connectedAt = 0
 		gatt?.close()
 		gatt = null
 		writeChar = null
@@ -231,17 +253,54 @@ class CardiClient(
 
 	private val callback = object : BluetoothGattCallback() {
 		override fun onConnectionStateChange(g: BluetoothGatt, status: Int, newState: Int) {
-			Log.i(WIRE, "connection state=$newState status=$status")
+			val state = when (newState) {
+				BluetoothProfile.STATE_CONNECTED -> "CONNECTED"
+				BluetoothProfile.STATE_DISCONNECTED -> "DISCONNECTED"
+				else -> "state=$newState"
+			}
 			when (newState) {
-				BluetoothProfile.STATE_CONNECTED -> g.discoverServices()
+				BluetoothProfile.STATE_CONNECTED -> {
+					Log.i(WIRE, "link: $state ${gattStatus(status)}")
+					g.discoverServices()
+				}
 				BluetoothProfile.STATE_DISCONNECTED -> {
+					// How long the link survived is the useful number when the
+					// drops look periodic.
+					val uptime =
+						if (connectedAt > 0) "${System.currentTimeMillis() - connectedAt}ms" else "n/a"
+					Log.w(WIRE, "link: $state after $uptime — ${gattStatus(status)}")
+					connectedAt = 0
 					writeChar = null
 					onConnection(Connection.DISCONNECTED, g.device)
 				}
 			}
 		}
 
+		override fun onDescriptorWrite(
+			g: BluetoothGatt,
+			d: BluetoothGattDescriptor,
+			status: Int,
+		) {
+			Log.i(WIRE, "notifications enabled: ${gattStatus(status)}")
+		}
+
+		override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
+			Log.i(WIRE, "mtu=$mtu ${gattStatus(status)}")
+		}
+
+        override fun onReadRemoteRssi(g: BluetoothGatt, rssi: Int, status: Int) {
+			// Link quality in the seconds before a drop is the thing worth
+			// having when the disconnects look periodic rather than triggered.
+			Log.i(WIRE, "rssi=${rssi}dBm")
+		}
+
+		override fun onServiceChanged(g: BluetoothGatt) {
+			Log.w(WIRE, "kit reported its GATT services changed — re-discovering")
+			g.discoverServices()
+		}
+
 		override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+			Log.i(WIRE, "services discovered: ${gattStatus(status)}")
 			// A high-priority interval keeps the link alive under our 10 Hz
 			// write cadence; the default balanced interval is slow enough that
 			// the kit was timing the connection out mid-drag.
@@ -280,11 +339,32 @@ class CardiClient(
 			scope.launch {
 				// Replay the official app's connect handshake. The first write
 				// doubles as a state query whose reply seeds master/zone.
-				for (w in HANDSHAKE_WRITES) {
+				// captures/PROTOCOL_v1.md flags 18/17/16 as undecoded and a
+				// suspect for the stuck-flicker mode, so each step is logged
+				// with how long the kit took to acknowledge it.
+				Log.i(WIRE, "handshake: begin (${HANDSHAKE_WRITES.size} steps)")
+				HANDSHAKE_WRITES.forEachIndexed { i, w ->
+					val started = System.currentTimeMillis()
 					writeNow(w)
+					Log.i(
+						WIRE,
+						"handshake: step ${i + 1}/${HANDSHAKE_WRITES.size} ${hex(w)} " +
+							"acked in ${System.currentTimeMillis() - started}ms",
+					)
 					delay(MIN_INTERVAL_MS)
 				}
+				Log.i(WIRE, "handshake: done")
+				connectedAt = System.currentTimeMillis()
 				onConnection(Connection.CONNECTED, g.device)
+
+				rssiJob?.cancel()
+				rssiJob = scope.launch {
+					while (true) {
+						delay(3_000)
+						if (gatt == null) break
+						gatt?.readRemoteRssi()
+					}
+				}
 			}
 		}
 
@@ -293,6 +373,9 @@ class CardiClient(
 			c: BluetoothGattCharacteristic,
 			status: Int,
 		) {
+			if (status != BluetoothGatt.GATT_SUCCESS) {
+				Log.w(WIRE, "write rejected by the kit: ${gattStatus(status)}")
+			}
 			writeAck?.complete(status == BluetoothGatt.GATT_SUCCESS)
 		}
 

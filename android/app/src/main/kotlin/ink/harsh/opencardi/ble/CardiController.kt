@@ -258,6 +258,19 @@ object CardiController {
 	 */
 	private fun applyNotify(data: ByteArray) {
 		val u = data.map { it.toInt() and 0xFF }
+		val hex = u.joinToString(" ") { "%02X".format(it) }
+
+		// Anything the kit says that we cannot account for is worth seeing:
+		// unsolicited frames are a candidate explanation for both the cross-car
+		// flicker and the stuck-flicker mode.
+		val recognised =
+			(u.size == 4 && u[0] == 0x33 && u[3] == 0x34) ||
+				(u.size == 4 && u[0] == 0x0B && u[3] == 0xB0) ||
+				u.all { it == 0xFF }
+		if (!recognised) {
+			android.util.Log.w("CardiWire", "UNRECOGNISED notify (${u.size}B): $hex")
+		}
+
 		when {
 			// 33 ?? F0/0F 34 — master readback
 			u.size == 4 && u[0] == 0x33 && u[3] == 0x34 ->
