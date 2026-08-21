@@ -152,9 +152,13 @@ class CardiClient(
 		onConnection(Connection.CONNECTING, device)
 		// TRANSPORT_LE is explicit on purpose: these kits are BLE-only, and letting
 		// the stack pick AUTO can land on BR/EDR and fail service discovery.
+		// autoConnect = false: a direct, fast connection. With true the stack
+		// opens a slow background link, which is what the wire log showed
+		// dropping with status 8 (supervision timeout) every ten seconds and
+		// re-running the handshake each time.
 		gatt = device.connectGatt(
 			context,
-			/* autoConnect = */ true,
+			/* autoConnect = */ false,
 			callback,
 			BluetoothDevice.TRANSPORT_LE,
 		)
@@ -238,6 +242,10 @@ class CardiClient(
 		}
 
 		override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
+			// A high-priority interval keeps the link alive under our 10 Hz
+			// write cadence; the default balanced interval is slow enough that
+			// the kit was timing the connection out mid-drag.
+			g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
 			val service = g.getService(SERVICE_UUID) ?: run {
 				Log.w(TAG, "service ${SERVICE_UUID} not found")
 				onConnection(Connection.DISCONNECTED, g.device)

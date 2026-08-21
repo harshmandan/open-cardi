@@ -59,6 +59,13 @@ object CardiController {
 				}
 				if (connection == Connection.CONNECTED && device != null) {
 					prefs?.edit()?.putString(KEY_ADDRESS, device.address)?.apply()
+					// Push our zone outward on every connect. Without this the
+					// kit keeps whatever zone it was last told about, so colour
+					// writes landed on the footwell no matter what the phone
+					// was showing.
+					Zones.byId(_state.value.zoneId)?.let { zone ->
+						client?.send("zone", Commands.selectZone(zone.value))
+					}
 				}
 			},
 			onNotify = ::applyNotify,
@@ -256,9 +263,15 @@ object CardiController {
 			u.size == 4 && u[0] == 0x33 && u[3] == 0x34 ->
 				_state.update { it.copy(masterOn = u[2] == 0xF0) }
 
-			// 0B <zone> A1 B0 — zone readback
+			// 0B <zone> A1 B0 — zone readback. The K3 reports values the phone
+			// does not offer (it answered 3 = Doors, a K4-only zone), and
+			// accepting those left zoneId pointing at something the carousel
+			// cannot show while colour writes went to whatever zone was last
+			// selected on the wire. Only adopt a zone we can actually display.
 			u.size == 4 && u[0] == 0x0B && u[3] == 0xB0 ->
-				Zones.byValue(u[1])?.let { z -> _state.update { it.copy(zoneId = z.id) } }
+				Zones.byValue(u[1])
+					?.takeUnless { it.k4Only }
+					?.let { z -> _state.update { it.copy(zoneId = z.id) } }
 		}
 	}
 }
