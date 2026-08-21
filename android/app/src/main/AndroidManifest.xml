@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+	<!-- neverForLocation keeps us out of the location-permission prompt: we scan
+	     for one specific GATT service, we do not infer position from beacons. -->
+	<uses-permission
+		android:name="android.permission.BLUETOOTH_SCAN"
+		android:usesPermissionFlags="neverForLocation" />
+	<uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+	<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+
+	<uses-feature
+		android:name="android.hardware.bluetooth_le"
+		android:required="true" />
+
+	<application
+		android:allowBackup="true"
+		android:icon="@android:drawable/ic_menu_manage"
+		android:label="@string/app_name"
+		android:supportsRtl="true"
+		android:theme="@android:style/Theme.Material.NoActionBar">
+
+		<activity
+			android:name=".ui.MainActivity"
+			android:exported="true">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+		</activity>
+
+		<!-- Android Auto entry point. IOT is the category for controlling
+		     connected devices from the car. -->
+		<service
+			android:name=".car.CardiCarAppService"
+			android:exported="true">
+			<intent-filter>
+				<action android:name="androidx.car.app.CarAppService" />
+				<category android:name="androidx.car.app.category.IOT" />
+			</intent-filter>
+		</service>
+
+		<meta-data
+			android:name="com.google.android.gms.car.application"
+			android:resource="@xml/automotive_app_desc" />
+
+		<!-- Level 7 is what Header (the replacement for the deprecated
+		     setTitle/setHeaderAction) needs on every template we use. The
+		     projected host is the Android Auto app on the phone, which
+		     auto-updates, so this is a safe floor. -->
+		<meta-data
+			android:name="androidx.car.app.minCarApiLevel"
+			android:value="7" />
+
+		<service
+			android:name=".ble.CardiService"
+			android:exported="false"
+			android:foregroundServiceType="connectedDevice" />
+
+	</application>
+</manifest>

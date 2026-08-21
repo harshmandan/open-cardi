@@ -8,3 +8,9 @@ bun.lockb
 # Miscellaneous
 /static/
 .claude/
+
+# Generated + hand-checked byte vectors; the compact one-per-line shape is deliberate.
+/protocol/vectors.json
+
+# Android project (Gradle + Kotlin)
+/android/
