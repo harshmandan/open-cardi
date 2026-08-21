@@ -47,13 +47,12 @@
 			android:name="com.google.android.gms.car.application"
 			android:resource="@xml/automotive_app_desc" />
 
-		<!-- Level 7 is what Header (the replacement for the deprecated
-		     setTitle/setHeaderAction) needs on every template we use. The
-		     projected host is the Android Auto app on the phone, which
-		     auto-updates, so this is a safe floor. -->
+		<!-- Declared at 1 while we work out why the host will not list the app.
+		     A floor above the host's own level filters the app out before it
+		     ever reaches the launcher. -->
 		<meta-data
 			android:name="androidx.car.app.minCarApiLevel"
-			android:value="7" />
+			android:value="1" />
 
 		<service
 			android:name=".ble.CardiService"

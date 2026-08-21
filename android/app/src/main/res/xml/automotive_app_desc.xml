@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <automotiveApp>
 	<uses name="template" />
+	<!-- The host reads the level from here as well as from the manifest
+	     meta-data. A working third-party car app on this phone declares both;
+	     we only had the meta-data. -->
+	<api minCarApiLevel="1" />
 </automotiveApp>

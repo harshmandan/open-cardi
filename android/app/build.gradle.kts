@@ -32,9 +32,22 @@ android {
 		versionName = "0.8.0"
 	}
 
+	signingConfigs {
+		create("release") {
+			// Local dev key. Android Auto refuses to list debug-signed,
+			// debuggable packages, so even sideloaded testing needs a real
+			// release build.
+			storeFile = file("../keystore/opencardi.jks")
+			storePassword = "opencardi"
+			keyAlias = "opencardi"
+			keyPassword = "opencardi"
+		}
+	}
+
 	buildTypes {
 		release {
 			isMinifyEnabled = false
+			signingConfig = signingConfigs.getByName("release")
 		}
 	}
 

@@ -31,3 +31,4 @@ android/*/build
 android/local.properties
 android/.idea
 android/.kotlin
+android/keystore
