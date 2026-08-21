@@ -28,6 +28,8 @@ fun VerticalSlider(
 	valueRange: ClosedFloatingPointRange<Float>,
 	trackWidth: Dp,
 	trackHeight: Dp,
+	/** Rounded rectangle, not a capsule — a fully round track reads as a pill. */
+	trackCorner: Dp = 14.dp,
 	accent: Color,
 	modifier: Modifier = Modifier,
 	steps: Int = 0,
@@ -49,7 +51,12 @@ fun VerticalSlider(
 				SliderDefaults.Track(
 					sliderState = sliderState,
 					modifier = Modifier.height(trackWidth),
-					trackCornerSize = trackWidth / 2,
+					trackCornerSize = trackCorner,
+					// The snap stops stay, but drawing a tick for each of them
+					// down a fat track just speckles it. Same for the stop
+					// indicator, which lands at the top looking like a fault.
+					drawStopIndicator = null,
+					drawTick = { _, _ -> },
 				)
 			},
 			modifier = Modifier

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.LightMode
@@ -38,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -78,9 +80,9 @@ fun CarLayout(
 			modifier = Modifier
 				.fillMaxSize()
 				.windowInsetsPadding(WindowInsets.safeDrawing)
-				.padding(horizontal = 18.dp, vertical = 14.dp),
+				.padding(horizontal = 28.dp, vertical = 14.dp),
 			verticalAlignment = Alignment.CenterVertically,
-			horizontalArrangement = Arrangement.spacedBy(18.dp),
+			horizontalArrangement = Arrangement.spacedBy(28.dp, Alignment.CenterHorizontally),
 		) {
 			// 1 — controls
 			Column(
@@ -125,9 +127,15 @@ fun CarLayout(
 
 			// 2 — zones, flat buttons that outline in the accent when active
 			Column(
-				verticalArrangement = Arrangement.spacedBy(12.dp),
-				modifier = Modifier.width(150.dp),
+				verticalArrangement = Arrangement.spacedBy(10.dp),
+				modifier = Modifier.width(158.dp),
 			) {
+				Text(
+					"Select zone",
+					style = MaterialTheme.typography.labelMedium,
+					color = MaterialTheme.colorScheme.onSurfaceVariant,
+					modifier = Modifier.padding(start = 4.dp, bottom = 2.dp),
+				)
 				zones.forEach { zone ->
 					val selected = state.zoneId == zone.id
 					ToggleButton(
@@ -139,11 +147,11 @@ fun CarLayout(
 							contentColor = MaterialTheme.colorScheme.onSurface,
 							disabledContainerColor = MaterialTheme.colorScheme.surfaceContainer,
 							disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-							checkedContainerColor = accent.copy(alpha = 0.14f),
-							checkedContentColor = accent,
+							// Solid, not outlined: the active zone fills with the
+							// colour it is currently showing.
+							checkedContainerColor = accent,
+							checkedContentColor = onAccent(accent),
 						),
-						border = if (selected)
-							androidx.compose.foundation.BorderStroke(1.5.dp, accent) else null,
 						modifier = Modifier
 							.fillMaxWidth()
 							.height(54.dp),
@@ -164,15 +172,15 @@ fun CarLayout(
 			Column(
 				verticalArrangement = Arrangement.spacedBy(12.dp),
 				horizontalAlignment = Alignment.CenterHorizontally,
-				modifier = Modifier.weight(1f),
 			) {
 				colors.chunked(3).forEach { row ->
 					Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
 						row.forEach { favorite ->
 							val fill =
 								Color(favorite.color.r, favorite.color.g, favorite.color.b)
+							val active = state.color == favorite.color
 							ToggleButton(
-								checked = state.color == favorite.color,
+								checked = active,
 								onCheckedChange = { CardiController.applyFavorite(favorite) },
 								shapes = ToggleButtonShapes(
 									CircleShape,
@@ -189,7 +197,22 @@ fun CarLayout(
 								),
 								contentPadding = PaddingValues(0.dp),
 								modifier = Modifier.size(52.dp),
-							) {}
+							) {
+								// The selected swatch says so with a tick in its
+								// own inverse, which stays legible on any colour.
+								if (active) {
+									Icon(
+										Icons.Filled.Check,
+										contentDescription = "Selected",
+										tint = Color(
+											255 - favorite.color.r,
+											255 - favorite.color.g,
+											255 - favorite.color.b,
+										),
+										modifier = Modifier.size(24.dp),
+									)
+								}
+							}
 						}
 						repeat(3 - row.size) { Spacer(Modifier.size(52.dp)) }
 					}
@@ -227,6 +250,10 @@ fun CarLayout(
 		}
 	}
 }
+
+/** Readable ink over a filled accent, by perceived luminance. */
+private fun onAccent(accent: Color): Color =
+	if (accent.luminance() > 0.5f) Color.Black.copy(alpha = 0.85f) else Color.White
 
 @Composable
 private fun CarRule() {
