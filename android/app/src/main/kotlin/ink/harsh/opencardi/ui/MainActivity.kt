@@ -1203,13 +1203,13 @@ private fun SettingsSheet(state: CardiState) {
 
 	GroupLabel("Lock code")
 	Text(
-		"Lock stops your lights following other Cardi cars nearby. Decode undoes " +
+		"Lock stops your lights following other Cardi cars nearby. Unlock undoes " +
 			"it. The lights end on red or green — pick your colour again after.",
 		style = MaterialTheme.typography.bodySmall,
 		color = MaterialTheme.colorScheme.onSurfaceVariant,
 	)
-	KnockButton(state, "lock", "Lock code")
-	KnockButton(state, "decode", "Decode")
+	KnockButton(state, "lock", "Lock")
+	KnockButton(state, "decode", "Unlock")
 
 	GroupLabel("Factory reset")
 	Text(
