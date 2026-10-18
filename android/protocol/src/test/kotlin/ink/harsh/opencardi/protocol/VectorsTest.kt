@@ -42,6 +42,7 @@ class VectorsTest {
 		"fragranceOn" -> Commands.fragranceOn()
 		"fragranceOff" -> Commands.fragranceOff()
 		"getLightData" -> Commands.getLightData()
+		"factoryReset" -> Commands.factoryReset()
 		else -> throw IllegalArgumentException("no Kotlin binding for '$fn'")
 	}
 

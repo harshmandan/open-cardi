@@ -38,6 +38,7 @@
 	{"fn":"setAppMode","args":[2],"bytes":"FA 02 AF","note":"Starlight"},
 	{"fn":"fragranceOn","args":[],"bytes":"F8 F0 8F"},
 	{"fn":"fragranceOff","args":[],"bytes":"F8 0F 8F"},
-	{"fn":"getLightData","args":[],"bytes":"3C AA AA 3D","note":"also handshake write 1"}
+	{"fn":"getLightData","args":[],"bytes":"3C AA AA 3D","note":"also handshake write 1"},
+	{"fn":"factoryReset","args":[],"bytes":"F1 F2 F3 F4 F5 F6","note":"Cardi-RGBW 1.2.2 Restore Factory Settings"}
 ]
 

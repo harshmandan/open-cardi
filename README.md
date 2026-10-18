@@ -29,7 +29,7 @@ The web app stays online for reference and for kits that don't reset, but use it
 
 ## Android app
 
-Native Kotlin (`android/`), with an Android Auto screen. It connects the way the vendor app does (default packet size, normal connection interval), reconnects on its own if the kit resets, lists nearby kits by name and MAC to choose from, and has Lock code / Decode under Settings.
+Native Kotlin (`android/`), with an Android Auto screen. It connects the way the vendor app does (default packet size, normal connection interval), reconnects on its own if the kit resets, lists nearby kits by name and MAC to choose from, and has Lock code, Decode and Factory reset under Settings.
 
 Build it yourself:
 
@@ -59,6 +59,7 @@ Decoded ops (from decompiling two vendor apps — Cardi Tech 1.20 and Cardi-RGBW
 | lock code       | red + 5× master off/on       | stop following nearby Cardi controllers (\*)     |
 | decode          | green + 5× master off/on     | undo lock code (\*)                              |
 | version query   | `1E 00 E1`                   | reply `0C …`, version in byte 4 — K3 ignores it  |
+| factory reset   | `F1 F2 F3 F4 F5 F6`          | restore factory settings; the kit restarts       |
 
 (\*) Lock code and Decode have no opcode of their own: the firmware recognises a colour followed by five master off/on pairs, 200 ms apart. Open-cardi sends them from **Settings** (Android) or **More → Lock code** (web), and caps master writes at 4 per 2.5 s so the power button can't send one by accident. That they stop cross-car colour changes is inferred from the vendor's naming (锁码 / 解码), not yet confirmed.
 

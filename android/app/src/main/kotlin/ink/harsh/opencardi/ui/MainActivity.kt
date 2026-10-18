@@ -1210,6 +1210,54 @@ private fun SettingsSheet(state: CardiState) {
 	)
 	KnockButton(state, "lock", "Lock code")
 	KnockButton(state, "decode", "Decode")
+
+	GroupLabel("Factory reset")
+	Text(
+		"Restores the kit's factory settings, as in the vendor app. The kit " +
+			"restarts and the app reconnects.",
+		style = MaterialTheme.typography.bodySmall,
+		color = MaterialTheme.colorScheme.onSurfaceVariant,
+	)
+	ConfirmButton(
+		label = "Restore defaults",
+		enabled = state.isConnected && state.knock == null,
+		onConfirm = CardiController::factoryReset,
+	)
+}
+
+/** Two-tap confirm for a one-shot action: first tap arms, second sends. */
+@Composable
+private fun ConfirmButton(label: String, enabled: Boolean, onConfirm: () -> Unit) {
+	var armedAt by remember { mutableLongStateOf(0L) }
+	val armed = armedAt != 0L
+	LaunchedEffect(armedAt) {
+		if (armedAt != 0L) {
+			kotlinx.coroutines.delay(3_000)
+			armedAt = 0L
+		}
+	}
+	ToggleButton(
+		checked = armed,
+		enabled = enabled,
+		onCheckedChange = {
+			if (armed) {
+				armedAt = 0L
+				onConfirm()
+			} else {
+				armedAt = System.currentTimeMillis()
+			}
+		},
+		shapes = pillShapes(),
+		colors = tileColors(),
+		modifier = Modifier
+			.fillMaxWidth()
+			.height(52.dp),
+	) {
+		Text(
+			if (armed) "Tap again to confirm" else if (!enabled) "$label (connect first)" else label,
+			style = MaterialTheme.typography.labelLarge,
+		)
+	}
 }
 
 /**

@@ -92,4 +92,11 @@ object Commands {
 	 * first handshake write and as a post-colour probe.
 	 */
 	fun getLightData(): ByteArray = byteArrayOf(0x3C, 0xAA.toByte(), 0xAA.toByte(), 0x3D)
+
+	/**
+	 * "Restore Factory Settings" in Cardi-RGBW 1.2.2 (BYLightActivity, behind a
+	 * confirm dialog). No reply; the kit is expected to reboot.
+	 */
+	fun factoryReset(): ByteArray =
+		byteArrayOf(0xF1.toByte(), 0xF2.toByte(), 0xF3.toByte(), 0xF4.toByte(), 0xF5.toByte(), 0xF6.toByte())
 }

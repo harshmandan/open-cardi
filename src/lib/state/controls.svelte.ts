@@ -442,6 +442,17 @@ async function runKnock(which: 'lock' | 'decode', frames: TimedFrame[]) {
 	}
 }
 
+// Restore Factory Settings (F1..F6). Sent on its own, not coalesced with
+// anything; the kit is expected to reboot, which drops the link.
+export function sendFactoryReset() {
+	if (!client?.connected) {
+		pushError('Connect to the kit first.');
+		return;
+	}
+	logInfo('factory reset: sending F1 F2 F3 F4 F5 F6');
+	sendCoalesced('factory-reset', cmd.factoryReset());
+}
+
 export function sendLockCode() {
 	return runKnock('lock', lockCodeSequence());
 }
