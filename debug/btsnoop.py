@@ -169,6 +169,16 @@ def main() -> None:
                         conn_since[handle] = local
                     if in_window:
                         print(f"{stamp}  LINK  connected handle=0x{handle:03x} status=0x{status:02x}")
+                elif sub == 0x07 and len(params) >= 11 and in_window:
+                    handle = struct.unpack("<H", params[1:3])[0] & 0x0FFF
+                    tx_oct, tx_time, rx_oct, rx_time = struct.unpack("<HHHH", params[3:11])
+                    print(f"{stamp}  LINK  data length handle=0x{handle:03x} "
+                          f"tx={tx_oct}B/{tx_time}us rx={rx_oct}B/{rx_time}us")
+                elif sub == 0x0C and len(params) >= 6 and in_window:
+                    status = params[1]
+                    handle = struct.unpack("<H", params[2:4])[0] & 0x0FFF
+                    print(f"{stamp}  LINK  PHY handle=0x{handle:03x} tx={params[4]} rx={params[5]} "
+                          f"(1=1M 2=2M 3=coded) status=0x{status:02x}")
                 elif sub == 0x03 and len(params) >= 10 and in_window:
                     status = params[1]
                     handle = struct.unpack("<H", params[2:4])[0] & 0x0FFF
