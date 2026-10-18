@@ -2,6 +2,7 @@
 	import { fly, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import Credits from './Credits.svelte';
+	import FactoryResetControl from './FactoryResetControl.svelte';
 	import KitInfo from './KitInfo.svelte';
 	import LockCodeControl from './LockCodeControl.svelte';
 	import MicModeSelector from './MicModeSelector.svelte';
@@ -24,6 +25,7 @@
 			<MicModeSelector />
 			<ShowAllZonesToggle />
 			<LockCodeControl />
+			<FactoryResetControl />
 			<KitInfo />
 			<WireLogControls />
 			<Credits />
@@ -61,6 +63,7 @@
 				<MicModeSelector />
 				<ShowAllZonesToggle />
 				<LockCodeControl />
+				<FactoryResetControl />
 				<KitInfo />
 				<WireLogControls />
 				<Credits />

@@ -181,6 +181,16 @@ object CardiController {
 
 	// --- lock code / decode --------------------------------------------------
 
+	/**
+	 * Restore Factory Settings (F1..F6), as in Cardi-RGBW 1.2.2. The kit is
+	 * expected to reboot; auto-reconnect brings the link back.
+	 */
+	fun factoryReset() {
+		if (!_state.value.isConnected || _state.value.knock != null) return
+		android.util.Log.i("CardiWire", "factory reset: sending F1 F2 F3 F4 F5 F6")
+		client?.send("factory-reset", Commands.factoryReset())
+	}
+
 	fun sendLockCode() = runKnock("lock")
 
 	fun sendDecode() = runKnock("decode")

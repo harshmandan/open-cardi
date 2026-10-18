@@ -83,3 +83,9 @@ export function fragranceOff(): Uint8Array {
 export function getLightData(): Uint8Array {
 	return new Uint8Array([0x3c, 0xaa, 0xaa, 0x3d]);
 }
+
+// "Restore Factory Settings" in Cardi-RGBW 1.2.2 (BYLightActivity, behind a
+// confirm dialog). No reply; the kit is expected to reboot.
+export function factoryReset(): Uint8Array {
+	return new Uint8Array([0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6]);
+}
