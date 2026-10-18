@@ -23,6 +23,7 @@ Or with plain pip:
 from __future__ import annotations
 
 import argparse
+import re
 import asyncio
 import sys
 from datetime import datetime
@@ -553,6 +554,91 @@ async def cmd_send(args: argparse.Namespace) -> None:
 
 
 # ----------------------------------------------------------------------------
+# Subcommand: replay — resend a saved web-app wire log with its original timing
+# ----------------------------------------------------------------------------
+
+_LOG_LINE = re.compile(
+    r"^(?P<clock>\d\d:\d\d:\d\d\.\d{3}) \[\+(?P<ms>\d+)ms\] SEND\s+(?P<label>\S+)\s+(?P<hex>[0-9a-f ]+)$"
+)
+
+
+def parse_wire_log(path: str, since: str | None, until: str | None,
+                   skip_queries: bool) -> list[tuple[float, str, bytes, str]]:
+    """SEND lines from an open-cardi wire log as (seconds, clock, bytes, label).
+    Handshake lines are dropped: connect() already sends the handshake."""
+    out = []
+    for line in open(path, encoding="utf-8"):
+        m = _LOG_LINE.match(line.rstrip("\n"))
+        if not m:
+            continue
+        clock, label = m["clock"], m["label"]
+        if since and clock < since:
+            continue
+        if until and clock > until:
+            continue
+        if label in ("hs_readzone", "hs_version", "hs_18", "hs_17", "hs_16"):
+            continue
+        if skip_queries and label == "hs_getlight":
+            continue
+        out.append((int(m["ms"]) / 1000, clock, bytes.fromhex(m["hex"]), label))
+    return out
+
+
+async def cmd_replay(args: argparse.Namespace) -> None:
+    frames = parse_wire_log(args.log, args.since, args.until, args.skip_queries)
+    if not frames:
+        log_info("nothing to replay (check --since/--until)")
+        return
+    log_info(f"replaying {len(frames)} writes from {frames[0][1]} to {frames[-1][1]}"
+             f"{' (state queries skipped)' if args.skip_queries else ''}")
+
+    client = await connect(args.mac, args.name, args.scan_timeout, args.legacy_handshake)
+    stop = asyncio.Event()
+
+    # Liveness by GATT *read* of FFE1, so the check itself sends no command
+    # to the kit's parser. A read that fails or times out means it stopped.
+    async def watch() -> None:
+        misses = 0
+        while not stop.is_set():
+            try:
+                await asyncio.wait_for(client.read_gatt_char(NOTIFY_UUID), timeout=1.5)
+                if misses:
+                    log_info(f"liveness: kit answering again after {misses} missed reads")
+                misses = 0
+            except Exception as e:
+                misses += 1
+                log_info(f"liveness: READ FAILED ({misses} in a row) — {type(e).__name__}")
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=args.probe_every)
+            except asyncio.TimeoutError:
+                pass
+
+    watcher = asyncio.create_task(watch())
+    try:
+        await asyncio.sleep(args.settle)
+        t0 = asyncio.get_running_loop().time()
+        base = frames[0][0]
+        for at, clock, payload, label in frames:
+            delay = (at - base) - (asyncio.get_running_loop().time() - t0)
+            if delay > 0:
+                await asyncio.sleep(delay)
+            if not client.is_connected:
+                log_info("link lost — stopping replay")
+                break
+            await write(client, payload, f"{label} (orig {clock})")
+        log_info(f"replay done; watching for {args.tail:.0f}s more")
+        await asyncio.sleep(args.tail)
+    finally:
+        stop.set()
+        await watcher
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
+        log_info("disconnected")
+
+
+# ----------------------------------------------------------------------------
 # Subcommand: repl — interactive prompt with optional keepalive
 # ----------------------------------------------------------------------------
 
@@ -697,6 +783,20 @@ def build_parser() -> argparse.ArgumentParser:
     s_send.add_argument("commands", nargs="+", help="command tokens, e.g. red blue 'c 128 64 32' 'z floor'")
     s_send.add_argument("--delay", type=float, default=0.5, help="delay between commands (default: 0.5s)")
 
+    s_replay = sub.add_parser("replay", parents=[common],
+                              help="resend a saved web-app wire log with its original timing")
+    s_replay.add_argument("log", help="open-cardi-log-*.txt saved from the web app")
+    s_replay.add_argument("--since", help="first clock time to replay, e.g. 22:33:21.000")
+    s_replay.add_argument("--until", help="last clock time to replay")
+    s_replay.add_argument("--skip-queries", action="store_true",
+                          help="drop 3C AA AA 3D state queries (heartbeat/probe)")
+    s_replay.add_argument("--probe-every", type=float, default=1.0,
+                          help="seconds between liveness reads (default 1.0)")
+    s_replay.add_argument("--settle", type=float, default=2.0,
+                          help="seconds to wait after connecting before the first write")
+    s_replay.add_argument("--tail", type=float, default=10.0,
+                          help="seconds to keep watching after the last write")
+
     return p
 
 
@@ -707,6 +807,7 @@ def main() -> int:
         "repl": cmd_repl,
         "monitor": cmd_monitor,
         "send": cmd_send,
+        "replay": cmd_replay,
     }
     try:
         asyncio.run(handlers[args.cmd](args))
