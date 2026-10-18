@@ -7,8 +7,8 @@
 	import MicModeSelector from './MicModeSelector.svelte';
 	import PatternPicker from './PatternPicker.svelte';
 	import ShowAllZonesToggle from './ShowAllZonesToggle.svelte';
+	import WireLogControls from './WireLogControls.svelte';
 	import { controls, toggleMore } from '$lib/state/controls.svelte';
-	import { downloadLog, wirelog } from '$lib/state/wirelog.svelte';
 	import { ICON_CHEVRON } from './icons.svelte';
 
 	let { mode = 'sheet' }: { mode?: 'sheet' | 'sidebar' } = $props();
@@ -25,17 +25,7 @@
 			<ShowAllZonesToggle />
 			<LockCodeControl />
 			<KitInfo />
-			<div class="flex items-center justify-between">
-				<span class="text-10 font-500 tracking-wider uppercase opacity-50">BLE wire log</span>
-				<button
-					type="button"
-					onclick={downloadLog}
-					class="flex items-center gap-8 border border-foreground/15 px-10 py-6 text-12 font-500 hover:bg-foreground/5"
-				>
-					<span class="opacity-60">{wirelog.count}</span>
-					<span>save</span>
-				</button>
-			</div>
+			<WireLogControls />
 			<Credits />
 		</aside>
 	{/if}
@@ -72,17 +62,7 @@
 				<ShowAllZonesToggle />
 				<LockCodeControl />
 				<KitInfo />
-				<div class="flex items-center justify-between">
-					<span class="text-10 font-500 tracking-wider uppercase opacity-50">BLE wire log</span>
-					<button
-						type="button"
-						onclick={downloadLog}
-						class="flex items-center gap-8 border border-foreground/15 px-10 py-6 text-12 font-500 hover:bg-foreground/5"
-					>
-						<span class="opacity-60">{wirelog.count}</span>
-						<span>save</span>
-					</button>
-				</div>
+				<WireLogControls />
 				<Credits />
 			</div>
 		</div>
