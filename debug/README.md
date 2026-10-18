@@ -74,7 +74,7 @@ uv run debug/open-cardi.py send red blue 'c 128 64 32' 'z floor' --delay 1.0
 
 All connecting commands accept `--mac <addr>`, `--name <prefix>`, and `--scan-timeout <sec>`.
 
-`--legacy-handshake` sends the old Cardi Tech handshake (`3C AA AA 3D`, `0E AA E0`, `18 00 81`, `17 00 71`, `16 00 61`) instead of the current one (`3C AA AA 3D`, `0E AA E0`, `1E 00 E1`). The extra three are fragrance and air-purifier queries; use the flag only to compare the two.
+`--legacy-handshake` sends the old Cardi Tech handshake (`3C AA AA 3D`, `0E AA E0`, `18 00 81`, `17 00 71`, `16 00 61`) instead of the current one (`3C AA AA 3D`, `0E AA E0`). The extra three are fragrance and air-purifier queries; use the flag only to compare the two.
 
 ## REPL cheatsheet
 
@@ -90,7 +90,7 @@ breathe N                     breathing pattern 0..8 (ED 60..68) — untested on
 speed N                       pattern speed 1..31
 mic on 0..3 | mic off         device-mic mode
 lock | decode                 lock code / decode knock
-version                       firmware version query (1E 00 E1)
+version                       firmware version query (1E 00 E1) — K3 doesn't answer
 reset confirm                 factory reset (F1 F2 F3 F4 F5 F6) — untested
 raw HEX                       send arbitrary bytes (e.g. raw ed49ff0000e9)
 ka on                         keepalive — re-emit last color every 8s
@@ -103,8 +103,7 @@ q                             disconnect and quit
 These came from the Cardi-RGBW 1.2.2 decompile and haven't been tried on the
 hardware yet. Run them from the `repl`.
 
-1. **Firmware version.** `version`. Expect a `0C …` reply and a
-   `firmware version byte = N` line. The web app shows it under More once known.
+1. ~~**Firmware version.**~~ Done 2026-10-18: the K3 doesn't answer `1E 00 E1`.
 2. **Breathing patterns.** `z overall`, then `breathe 0` through `breathe 8`.
    Note which ones animate. If they all do, add them to the app's pattern list.
 3. **Pattern labels.** `p 1`, `p 2`, `p 21` (opcodes `36`, `37`, `4B`). The
