@@ -55,13 +55,21 @@ DEVICE_NAME_PREFIXES = (
     "Flash",
 )
 
-# Init handshake observed in HCI captures (matches Java getLightData / readisnewmod)
+# Init handshake, as sent by the Cardi-RGBW 1.2.2 vendor app. The older Cardi
+# Tech app also sent 18 00 81 / 17 00 71 / 16 00 61 — fragrance and air-purifier
+# state queries a lights-only kit has no use for. `--legacy-handshake` sends
+# those instead, for comparing the two.
 HANDSHAKE_WRITES: list[bytes] = [
-    bytes.fromhex("3caaaa3d"),  # getLightData()
+    bytes.fromhex("3caaaa3d"),  # getLightData() — master/state query
     bytes.fromhex("0eaae0"),    # readisnewmod() — query current zone
-    bytes.fromhex("180081"),    # session lifecycle (purpose unmapped)
-    bytes.fromhex("170071"),
-    bytes.fromhex("160061"),
+    bytes.fromhex("1e00e1"),    # firmware version query, reply 0C .. .. .. NN
+]
+LEGACY_HANDSHAKE_WRITES: list[bytes] = [
+    bytes.fromhex("3caaaa3d"),
+    bytes.fromhex("0eaae0"),
+    bytes.fromhex("180081"),    # fragrance timer query
+    bytes.fromhex("170071"),    # fragrance state query
+    bytes.fromhex("160061"),    # air-purifier state query
 ]
 
 # Common preset colors
@@ -186,6 +194,39 @@ def cmd_fragrance(on: bool) -> bytes:
     return bytes([0xF8, 0xF0 if on else 0x0F, 0x8F])
 
 
+def cmd_breathing(index: int) -> bytes:
+    """ED 60..68 00 00 00 E9 — breathing patterns added in Cardi-RGBW 1.2.2:
+    red, green, blue, yellow, cyan, purple, white, 7-color, 3-color.
+    Not yet confirmed on K3 firmware."""
+    if not 0 <= index <= 8:
+        raise ValueError("breathing index 0..8")
+    return bytes([0xED, 0x60 + index, 0x00, 0x00, 0x00, 0xE9])
+
+
+def cmd_version_query() -> bytes:
+    """1E 00 E1 — firmware version query. Reply: 0C .. .. .. NN, NN = version."""
+    return bytes.fromhex("1e00e1")
+
+
+def cmd_factory_reset() -> bytes:
+    """F1 F2 F3 F4 F5 F6 — "Restore Factory Settings" in Cardi-RGBW 1.2.2.
+    What it erases is unknown (lock code? zones? mode?). Untested."""
+    return bytes.fromhex("f1f2f3f4f5f6")
+
+
+def knock_frames(color: tuple[int, int, int]) -> list[bytes]:
+    """Lock code / Decode from Cardi-RGBW 1.2.2: a colour, then five master
+    off/on pairs, then on — all 200 ms apart. Red = lock, green = decode."""
+    frames = [cmd_set_color(*color)]
+    for _ in range(5):
+        frames += [cmd_master_off(), cmd_master_on()]
+    frames.append(cmd_master_on())
+    return frames
+
+
+KNOCK_STEP_S = 0.2
+
+
 def cmd_mode_classic() -> bytes:
     """FA 01 AF — switch to Classic mode (Java setMTX(0))."""
     return bytes.fromhex("fa01af")
@@ -265,19 +306,23 @@ async def discover(timeout: float = 6.0, name: str | None = None) -> BLEDevice |
 def make_notify_handler():
     def handler(_: BleakGATTCharacteristic, data: bytearray) -> None:
         log_rx(data)
+        if len(data) >= 5 and data[0] == 0x0C:
+            log_info(f"firmware version byte = {data[4]} (vendor app shows V 0.{data[4]} below 10)")
     return handler
 
 
-async def run_handshake(client: BleakClient, gap: float = 0.1) -> None:
-    log_info("running init handshake…")
-    for i, payload in enumerate(HANDSHAKE_WRITES, start=1):
-        log_tx(payload, label=f"handshake {i}/{len(HANDSHAKE_WRITES)}")
+async def run_handshake(client: BleakClient, gap: float = 0.1, legacy: bool = False) -> None:
+    writes = LEGACY_HANDSHAKE_WRITES if legacy else HANDSHAKE_WRITES
+    log_info(f"running {'legacy ' if legacy else ''}init handshake…")
+    for i, payload in enumerate(writes, start=1):
+        log_tx(payload, label=f"handshake {i}/{len(writes)}")
         await client.write_gatt_char(WRITE_UUID, payload, response=False)
         await asyncio.sleep(gap)
     log_info("handshake complete")
 
 
-async def connect(mac: str | None, name: str | None, scan_timeout: float) -> BleakClient:
+async def connect(mac: str | None, name: str | None, scan_timeout: float,
+                  legacy_handshake: bool = False) -> BleakClient:
     if mac:
         log_info(f"connecting to {mac}…")
         client = BleakClient(mac)
@@ -293,7 +338,7 @@ async def connect(mac: str | None, name: str | None, scan_timeout: float) -> Ble
     await client.start_notify(NOTIFY_UUID, make_notify_handler())
     log_info("subscribed to FFE1 notifications")
 
-    await run_handshake(client)
+    await run_handshake(client, legacy=legacy_handshake)
     return client
 
 
@@ -414,6 +459,33 @@ async def send_command(client: BleakClient, token: str, state: State) -> None:
             log_info("usage: mode classic | mode starlight")
         return
 
+    if head in ("breathe", "br") and len(rest) == 1:
+        idx = int(rest[0])
+        await write(client, cmd_breathing(idx), f"breathing {idx} (opcode 0x{0x60 + idx:02x})")
+        return
+
+    if head == "version":
+        await write(client, cmd_version_query(), "version query")
+        return
+
+    if head in ("lock", "decode"):
+        color = (255, 0, 0) if head == "lock" else (0, 255, 0)
+        frames = knock_frames(color)
+        log_info(f"{head}: {len(frames)} frames, {int(KNOCK_STEP_S * 1000)} ms apart")
+        for i, f in enumerate(frames, start=1):
+            await write(client, f, f"{head} {i}/{len(frames)}")
+            if i < len(frames):
+                await asyncio.sleep(KNOCK_STEP_S)
+        return
+
+    if head == "reset":
+        if rest != ["confirm"]:
+            log_info("factory reset (F1 F2 F3 F4 F5 F6) — effects unknown. "
+                     "Type 'reset confirm' to send it.")
+            return
+        await write(client, cmd_factory_reset(), "factory reset")
+        return
+
     # Raw
     if head == "raw" and len(rest) == 1:
         payload = bytes.fromhex(rest[0])
@@ -457,7 +529,7 @@ async def cmd_scan(args: argparse.Namespace) -> None:
 
 
 async def cmd_monitor(args: argparse.Namespace) -> None:
-    client = await connect(args.mac, args.name, args.scan_timeout)
+    client = await connect(args.mac, args.name, args.scan_timeout, args.legacy_handshake)
     try:
         log_info(f"monitoring for {args.duration}s — press ctrl-c to stop early")
         await asyncio.sleep(args.duration)
@@ -467,7 +539,7 @@ async def cmd_monitor(args: argparse.Namespace) -> None:
 
 
 async def cmd_send(args: argparse.Namespace) -> None:
-    client = await connect(args.mac, args.name, args.scan_timeout)
+    client = await connect(args.mac, args.name, args.scan_timeout, args.legacy_handshake)
     state = State()
     try:
         for i, token in enumerate(args.commands):
@@ -497,11 +569,16 @@ commands:
   z N      /  zone N               zone select by raw value (1..9)
   mode classic | mode starlight    classic ↔ starlight (FA 01 AF / FA 02 AF)
   p N      /  pattern N            built-in pattern, index 0..22
+  breathe N                        breathing pattern 0..8 (ED 60..68, untested on K3):
+                                     red green blue yellow cyan purple white 7-color 3-color
   speed N                          pattern speed 1..31 (1=fast, 31=slow)
   pbright N                        pattern-mode brightness 1..100
   ww N     /  w N                  warm-white channel brightness 0..100
   mic on 0..3 | mic off            device-mic mode (0=Classic, 1=Soft, 2=Jump, 3=Dance)
   fragrance on | fragrance off     fragrance dispenser toggle
+  lock | decode                    lock code / decode knock (colour + 5× off/on, 200 ms)
+  version                          firmware version query (1E 00 E1, reply 0C …)
+  reset confirm                    factory reset F1 F2 F3 F4 F5 F6 — effects unknown
   raw HEX                          arbitrary bytes (e.g. raw ed49ff0000e9)
   sleep S                          wait S seconds
   ka on | ka off                   keepalive — re-emit last color every 8s to fight idle drop
@@ -529,7 +606,7 @@ async def keepalive_loop(client: BleakClient, state: State, stop: asyncio.Event,
 
 
 async def cmd_repl(args: argparse.Namespace) -> None:
-    client = await connect(args.mac, args.name, args.scan_timeout)
+    client = await connect(args.mac, args.name, args.scan_timeout, args.legacy_handshake)
     state = State()
     ka_stop: asyncio.Event | None = None
     ka_task: asyncio.Task | None = None
@@ -605,6 +682,8 @@ def build_parser() -> argparse.ArgumentParser:
              "(default: any ConSmart-family prefix or service 0xFFF0)",
     )
     common.add_argument("--scan-timeout", type=float, default=6.0, help="scan timeout in seconds (default: 6.0)")
+    common.add_argument("--legacy-handshake", action="store_true",
+                        help="send the old Cardi Tech handshake (adds 18/17/16) instead of 1E 00 E1")
 
     s_scan = sub.add_parser("scan", help="list nearby BLE devices")
     s_scan.add_argument("--timeout", type=float, default=6.0)
