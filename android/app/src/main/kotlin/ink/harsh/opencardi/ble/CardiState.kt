@@ -19,11 +19,19 @@ data class CardiState(
 	 * they are not favourites — starring is a separate, deliberate act.
 	 */
 	val customColors: List<Favorite> = emptyList(),
+	/** Kits seen by the picker's scan, strongest signal first. */
+	val foundKits: List<FoundKit> = emptyList(),
+	val discovering: Boolean = false,
+	/** "lock" or "decode" while that sequence is being sent. */
+	val knock: String? = null,
 ) {
 	val isConnected: Boolean get() = connection == Connection.CONNECTED
 }
 
-enum class Connection { DISCONNECTED, SCANNING, CONNECTING, CONNECTED }
+enum class Connection { DISCONNECTED, SCANNING, CONNECTING, RECONNECTING, CONNECTED }
+
+/** A kit seen while scanning, for the device picker. */
+data class FoundKit(val address: String, val name: String?, val rssi: Int)
 
 data class Rgb(val r: Int, val g: Int, val b: Int)
 

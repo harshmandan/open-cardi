@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.GraphicEq
@@ -66,6 +67,7 @@ fun CarLayout(
 	onPatterns: () -> Unit,
 	onVoice: () -> Unit,
 	onConnect: () -> Unit,
+	onSettings: () -> Unit,
 ) {
 	val zones = Zones.list.filterNot { it.k4Only }
 	val pattern = state.patternIndex?.let { Patterns.list.getOrNull(it) }
@@ -120,6 +122,12 @@ fun CarLayout(
 					description = if (state.isConnected) "Disconnect" else "Connect",
 					selected = state.isConnected,
 					onClick = onConnect,
+				)
+				RoundControl(
+					icon = Icons.Filled.Settings,
+					description = "Settings",
+					selected = false,
+					onClick = onSettings,
 				)
 			}
 

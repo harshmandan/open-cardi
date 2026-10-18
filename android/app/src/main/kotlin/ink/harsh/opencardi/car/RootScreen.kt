@@ -152,6 +152,7 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 			when (connection) {
 				Connection.SCANNING -> "Looking for your lights…"
 				Connection.CONNECTING -> "Connecting…"
+				Connection.RECONNECTING -> "Reconnecting…"
 				else -> "Not connected."
 			}
 		)

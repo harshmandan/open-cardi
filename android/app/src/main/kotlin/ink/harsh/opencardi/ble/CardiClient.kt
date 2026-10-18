@@ -21,6 +21,7 @@ import ink.harsh.opencardi.protocol.DEVICE_NAME_PREFIXES
 import ink.harsh.opencardi.protocol.HANDSHAKE_WRITES
 import ink.harsh.opencardi.protocol.NOTIFY_CHARACTERISTIC
 import ink.harsh.opencardi.protocol.SERVICE_UUID
+import ink.harsh.opencardi.protocol.TimedFrame
 import ink.harsh.opencardi.protocol.WRITE_CHARACTERISTIC
 import java.util.UUID
 import kotlinx.coroutines.CompletableDeferred
@@ -70,6 +71,8 @@ private const val MIN_INTERVAL_MS = 100L
 
 private const val WRITE_ACK_TIMEOUT_MS = 500L
 private const val HEARTBEAT_MS = 3_000L
+private const val MASTER_WINDOW_MS = 2_500L
+private const val MASTER_MAX_IN_WINDOW = 4
 
 /**
  * GATT client for ConSmart-family kits. Port of `src/lib/ble/client.ts`, with
@@ -98,6 +101,7 @@ class CardiClient(
 	private var writeAck: CompletableDeferred<Boolean>? = null
 	private var connectedAt = 0L
 	private var rssiJob: kotlinx.coroutines.Job? = null
+	private val masterSendTimes = ArrayList<Long>()
 
 	// Heartbeat: ask for master state every few seconds and log when the kit
 	// stops answering. The kit has no "I'm stuck" message, so otherwise the log
@@ -111,15 +115,18 @@ class CardiClient(
 
 	private var scanCallback: ScanCallback? = null
 
-	/** Scans for a kit and connects to the first match. */
-	fun scanAndConnect(timeoutMs: Long = 15_000) {
+	/**
+	 * Scan and report every kit in range, without connecting — the device
+	 * picker shows them so the user chooses, like the vendor app's list.
+	 * Reports the same kit again as its signal strength changes.
+	 */
+	fun discover(onFound: (FoundKit) -> Unit, timeoutMs: Long = 15_000, onDone: () -> Unit = {}) {
 		val scanner = adapter?.bluetoothLeScanner ?: run {
 			Log.w(TAG, "no BLE scanner — is Bluetooth off?")
-			onConnection(Connection.DISCONNECTED, null)
+			onDone()
 			return
 		}
 		stopScan()
-		onConnection(Connection.SCANNING, null)
 
 		val cb = object : ScanCallback() {
 			override fun onScanResult(callbackType: Int, result: ScanResult) {
@@ -128,37 +135,34 @@ class CardiClient(
 					result.scanRecord?.serviceUuids?.any { it.uuid == SERVICE_UUID } == true
 				val nameMatch = name != null && DEVICE_NAME_PREFIXES.any { name.startsWith(it) }
 				if (!serviceMatch && !nameMatch) return
-
-				stopScan()
-				connect(result.device)
+				onFound(FoundKit(result.device.address, name, result.rssi))
 			}
 
 			override fun onScanFailed(errorCode: Int) {
 				Log.w(TAG, "scan failed: $errorCode")
 				stopScan()
-				onConnection(Connection.DISCONNECTED, null)
+				onDone()
 			}
 		}
 		scanCallback = cb
 
-		// Filter on the service UUID. Name prefixes can't be expressed as a
-		// ScanFilter (it only does exact names), so those are matched above.
-		val filters = listOf(
-			ScanFilter.Builder().setServiceUuid(ParcelUuid(SERVICE_UUID)).build()
-		)
+		// No ScanFilter: a kit that doesn't advertise FFF0 is still matched by
+		// name above, and a service filter would hide it.
 		val settings = ScanSettings.Builder()
 			.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
 			.build()
-		scanner.startScan(filters, settings, cb)
+		scanner.startScan(null, settings, cb)
 
 		scope.launch {
 			delay(timeoutMs)
-			if (scanCallback != null) {
+			if (scanCallback === cb) {
 				stopScan()
-				onConnection(Connection.DISCONNECTED, null)
+				onDone()
 			}
 		}
 	}
+
+	fun stopDiscovery() = stopScan()
 
 	private fun stopScan() {
 		scanCallback?.let { adapter?.bluetoothLeScanner?.stopScan(it) }
@@ -219,6 +223,29 @@ class CardiClient(
 		}
 	}
 
+	/**
+	 * Send frames in order with exact pauses, holding the write queue so
+	 * nothing lands between them. The coalescer keeps one payload per kind,
+	 * which would collapse a knock's alternating master writes into one.
+	 */
+	suspend fun sendSequence(frames: List<TimedFrame>): Boolean {
+		while (lock.withLock { if (draining) true else { draining = true; false } }) delay(20)
+		try {
+			val gap = MIN_INTERVAL_MS - (System.currentTimeMillis() - lastSendAt)
+			if (gap > 0) delay(gap)
+			for (f in frames) {
+				if (writeChar == null) return false
+				writeNow(f.bytes)
+				lastSendAt = System.currentTimeMillis()
+				if (f.delayAfterMs > 0) delay(f.delayAfterMs)
+			}
+			return true
+		} finally {
+			lock.withLock { draining = false }
+			drain()
+		}
+	}
+
 	private suspend fun drain() {
 		if (lock.withLock { if (draining) true else { draining = true; false } }) return
 		try {
@@ -228,6 +255,22 @@ class CardiClient(
 
 				val elapsed = System.currentTimeMillis() - lastSendAt
 				if (elapsed < MIN_INTERVAL_MS) delay(MIN_INTERVAL_MS - elapsed)
+
+				// Lock code and Decode are a colour followed by rapid master
+				// off/on toggles, so hammering the power button could send one
+				// by accident. The knock needs 11 master writes in ~2.2 s; this
+				// allows 4 per 2.5 s.
+				if (entry == "master") {
+					val now = System.currentTimeMillis()
+					while (masterSendTimes.isNotEmpty() && now - masterSendTimes.first() > MASTER_WINDOW_MS) {
+						masterSendTimes.removeAt(0)
+					}
+					if (masterSendTimes.size >= MASTER_MAX_IN_WINDOW) {
+						delay(MASTER_WINDOW_MS - (now - masterSendTimes.first()))
+						masterSendTimes.removeAt(0)
+					}
+					masterSendTimes.add(System.currentTimeMillis())
+				}
 
 				// Re-read after the wait: a slider may have produced a fresher
 				// payload for this kind while we slept. Latest-wins still holds.
@@ -298,6 +341,9 @@ class CardiClient(
 
 		override fun onMtuChanged(g: BluetoothGatt, mtu: Int, status: Int) {
 			Log.i(WIRE, "mtu=$mtu ${gattStatus(status)}")
+			// With LabFlags.bigMtu the subscription waits for the MTU exchange,
+			// so the two GATT operations don't overlap.
+			if (LabFlags.bigMtu && writeChar != null) subscribe(g)
 		}
 
         override fun onReadRemoteRssi(g: BluetoothGatt, rssi: Int, status: Int) {
@@ -313,10 +359,13 @@ class CardiClient(
 
 		override fun onServicesDiscovered(g: BluetoothGatt, status: Int) {
 			Log.i(WIRE, "services discovered: ${gattStatus(status)}")
+			Log.i(WIRE, "lab: bigMtu=${LabFlags.bigMtu} highPriority=${LabFlags.highPriority}")
 			// A high-priority interval keeps the link alive under our 10 Hz
 			// write cadence; the default balanced interval is slow enough that
 			// the kit was timing the connection out mid-drag.
-			g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+			if (LabFlags.highPriority) {
+				g.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
+			}
 			val service = g.getService(SERVICE_UUID) ?: run {
 				Log.w(TAG, "service ${SERVICE_UUID} not found")
 				onConnection(Connection.DISCONNECTED, g.device)
@@ -341,11 +390,11 @@ class CardiClient(
 				)
 			}
 
-			service.getCharacteristic(NOTIFY_CHARACTERISTIC)?.let { notify ->
-				g.setCharacteristicNotification(notify, true)
-				notify.getDescriptor(CCCD)?.let { d ->
-					g.writeDescriptor(d, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
-				}
+			if (LabFlags.bigMtu) {
+				Log.i(WIRE, "lab: requesting MTU 517")
+				g.requestMtu(517)
+			} else {
+				subscribe(g)
 			}
 
 			scope.launch {
@@ -400,6 +449,15 @@ class CardiClient(
 				heartbeatAnswered()
 			}
 			onNotify(value)
+		}
+	}
+
+	private fun subscribe(g: BluetoothGatt) {
+		g.getService(SERVICE_UUID)?.getCharacteristic(NOTIFY_CHARACTERISTIC)?.let { notify ->
+			g.setCharacteristicNotification(notify, true)
+			notify.getDescriptor(CCCD)?.let { d ->
+				g.writeDescriptor(d, BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE)
+			}
 		}
 	}
 

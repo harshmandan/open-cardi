@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -71,6 +72,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -99,6 +101,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import ink.harsh.opencardi.ble.LabFlags
 import ink.harsh.opencardi.ble.CardiController
 import ink.harsh.opencardi.ble.CardiService
 import ink.harsh.opencardi.ble.CardiState
@@ -118,15 +121,47 @@ import kotlin.math.sin
  */
 class MainActivity : ComponentActivity() {
 
+	// Bumped each time Connect is granted; the screen opens the device picker
+	// in response, like the vendor app's device list.
+	private var pickerRequest by mutableIntStateOf(0)
+
 	private val requestPermissions =
 		registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
 			if (granted[Manifest.permission.BLUETOOTH_CONNECT] == true) {
-				CardiService.start(this)
+				CardiController.startDiscovery()
+				pickerRequest++
 			}
 		}
 
+	private fun onConnectToggle(state: CardiState) {
+		// Connected, connecting or retrying: the button means "stop".
+		if (state.connection != Connection.DISCONNECTED) {
+			CardiService.stop(this)
+			CardiController.disconnect()
+		} else {
+			// Bluetooth only. POST_NOTIFICATIONS was bundled in here and made
+			// Connect look like it wanted to send you notifications; the
+			// foreground service runs either way, its notification just stays
+			// hidden if undenied.
+			requestPermissions.launch(
+				arrayOf(Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT)
+			)
+		}
+	}
+
+	private fun onPickKit(address: String) {
+		CardiController.choose(address)
+		CardiService.start(this)
+	}
+
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
+		intent?.let { i ->
+			if (i.hasExtra("bigMtu")) LabFlags.bigMtu = i.getBooleanExtra("bigMtu", false)
+			if (i.hasExtra("highPriority")) {
+				LabFlags.highPriority = i.getBooleanExtra("highPriority", true)
+			}
+		}
 		// targetSdk 35+ draws edge to edge whether we ask or not.
 		enableEdgeToEdge()
 		CardiController.init(this)
@@ -161,36 +196,23 @@ class MainActivity : ComponentActivity() {
 						accent = accent,
 						onPatterns = { wideSheet = Sheet.PATTERN },
 						onVoice = { wideSheet = Sheet.VOICE },
-						onConnect = {
-							if (state.isConnected) CardiService.stop(this@MainActivity)
-							else requestPermissions.launch(
-								arrayOf(
-									Manifest.permission.BLUETOOTH_SCAN,
-									Manifest.permission.BLUETOOTH_CONNECT,
-								)
-							)
-						},
+						onConnect = { onConnectToggle(state) },
+						onSettings = { wideSheet = Sheet.SETTINGS },
 					)
-					WideSheets(state, wideSheet) { wideSheet = Sheet.NONE }
+					LaunchedEffect(pickerRequest) { if (pickerRequest > 0) wideSheet = Sheet.DEVICES }
+					WideSheets(state, wideSheet, onPick = ::onPickKit) {
+						if (wideSheet == Sheet.DEVICES) CardiController.stopDiscovery()
+						wideSheet = Sheet.NONE
+					}
 					return@OpenCardiTheme
 				}
 
 				Screen(
 					state = state,
 					accent = accent,
-					onConnectToggle = {
-						if (state.isConnected) CardiService.stop(this)
-						// Bluetooth only. POST_NOTIFICATIONS was bundled in here and
-						// made Connect look like it wanted to send you
-						// notifications; the foreground service runs either way,
-						// its notification just stays hidden if undenied.
-						else requestPermissions.launch(
-							arrayOf(
-								Manifest.permission.BLUETOOTH_SCAN,
-								Manifest.permission.BLUETOOTH_CONNECT,
-							)
-						)
-					},
+					pickerRequest = pickerRequest,
+					onConnectToggle = { onConnectToggle(state) },
+					onPick = ::onPickKit,
 				)
 			}
 		}
@@ -202,11 +224,18 @@ private val PALETTE = listOf(
 	Rgb(0, 220, 255), Rgb(40, 80, 255), Rgb(150, 0, 255), Rgb(255, 255, 255),
 )
 
-private enum class Sheet { NONE, PATTERN, VOICE, CUSTOM_COLOR, ABOUT }
+private enum class Sheet { NONE, PATTERN, VOICE, CUSTOM_COLOR, ABOUT, DEVICES, SETTINGS }
 
 @Composable
-private fun Screen(state: CardiState, accent: Color, onConnectToggle: () -> Unit) {
+private fun Screen(
+	state: CardiState,
+	accent: Color,
+	pickerRequest: Int,
+	onConnectToggle: () -> Unit,
+	onPick: (String) -> Unit,
+) {
 	var sheet by remember { mutableStateOf(Sheet.NONE) }
+	LaunchedEffect(pickerRequest) { if (pickerRequest > 0) sheet = Sheet.DEVICES }
 	var selectedShape by remember { mutableStateOf(SELECTABLE_SHAPES.first()) }
 	val zones = remember { Zones.list.filterNot { it.k4Only } }
 
@@ -269,7 +298,12 @@ private fun Screen(state: CardiState, accent: Color, onConnectToggle: () -> Unit
 
 			Spacer(Modifier.height(16.dp))
 
-			BottomBar(state, onConnectToggle) { sheet = Sheet.ABOUT }
+			BottomBar(
+				state = state,
+				onToggle = onConnectToggle,
+				onAbout = { sheet = Sheet.ABOUT },
+				onSettings = { sheet = Sheet.SETTINGS },
+			)
 
 			Spacer(Modifier.height(12.dp))
 		}
@@ -282,7 +316,10 @@ private fun Screen(state: CardiState, accent: Color, onConnectToggle: () -> Unit
 		val maxSheetHeight = (LocalConfiguration.current.screenHeightDp * 0.82f).dp
 		val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 		ModalBottomSheet(
-			onDismissRequest = { sheet = Sheet.NONE },
+			onDismissRequest = {
+				if (sheet == Sheet.DEVICES) CardiController.stopDiscovery()
+				sheet = Sheet.NONE
+			},
 			sheetState = sheetState,
 			containerColor = MaterialTheme.colorScheme.surfaceContainer,
 			// We reserve the gesture-bar space ourselves below; letting the
@@ -325,6 +362,11 @@ private fun Screen(state: CardiState, accent: Color, onConnectToggle: () -> Unit
 					Sheet.VOICE -> VoiceSheet(state) { sheet = Sheet.NONE }
 					Sheet.CUSTOM_COLOR -> CustomColorSheet(state.brightness) { sheet = Sheet.NONE }
 					Sheet.ABOUT -> AboutSheet()
+					Sheet.DEVICES -> DeviceSheet(state) { address ->
+						sheet = Sheet.NONE
+						onPick(address)
+					}
+					Sheet.SETTINGS -> SettingsSheet(state)
 					Sheet.NONE -> Unit
 				}
 			}
@@ -425,7 +467,12 @@ private fun ZoneArea(
 
 /** Pattern and voice pickers for the wide layout, which has no sheet host. */
 @Composable
-private fun WideSheets(state: CardiState, sheet: Sheet, onDismiss: () -> Unit) {
+private fun WideSheets(
+	state: CardiState,
+	sheet: Sheet,
+	onPick: (String) -> Unit,
+	onDismiss: () -> Unit,
+) {
 	if (sheet == Sheet.NONE) return
 	val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 	val maxSheetHeight = (LocalConfiguration.current.screenHeightDp * 0.9f).dp
@@ -453,6 +500,11 @@ private fun WideSheets(state: CardiState, sheet: Sheet, onDismiss: () -> Unit) {
 				when (sheet) {
 					Sheet.PATTERN -> PatternSheet(state, onDismiss)
 					Sheet.VOICE -> VoiceSheet(state, onDismiss)
+					Sheet.DEVICES -> DeviceSheet(state) { address ->
+						onDismiss()
+						onPick(address)
+					}
+					Sheet.SETTINGS -> SettingsSheet(state)
 					else -> Unit
 				}
 			}
@@ -632,7 +684,12 @@ private fun SquareAction(
 
 /** Connects or disconnects on the spot — no sheet, no second confirmation. */
 @Composable
-private fun BottomBar(state: CardiState, onToggle: () -> Unit, onAbout: () -> Unit) {
+private fun BottomBar(
+	state: CardiState,
+	onToggle: () -> Unit,
+	onAbout: () -> Unit,
+	onSettings: () -> Unit,
+) {
 	Row(
 		modifier = Modifier
 			.fillMaxWidth()
@@ -656,6 +713,21 @@ private fun BottomBar(state: CardiState, onToggle: () -> Unit, onAbout: () -> Un
 		}
 
 		ToggleButton(
+			checked = false,
+			onCheckedChange = { onSettings() },
+			shapes = ToggleButtonShapes(CircleShape, CircleShape, CircleShape),
+			colors = tileColors(),
+			contentPadding = PaddingValues(0.dp),
+			modifier = Modifier.size(44.dp),
+		) {
+			Icon(
+				Icons.Filled.Settings,
+				contentDescription = "Settings",
+				modifier = Modifier.size(18.dp),
+			)
+		}
+
+		ToggleButton(
 			checked = state.isConnected,
 			onCheckedChange = { onToggle() },
 			shapes = pillShapes(),
@@ -671,6 +743,7 @@ private fun BottomBar(state: CardiState, onToggle: () -> Unit, onAbout: () -> Un
 				when (state.connection) {
 					Connection.CONNECTED -> state.deviceName ?: "Connected"
 					Connection.CONNECTING -> "Connecting…"
+					Connection.RECONNECTING -> "Reconnecting…"
 					Connection.SCANNING -> "Scanning…"
 					Connection.DISCONNECTED -> "Connect"
 				},
@@ -1037,5 +1110,148 @@ private fun WavyTrack(sliderState: SliderState, thick: Boolean = false) {
 			}
 			drawPath(path, color = active, style = Stroke(width = widthPx, cap = StrokeCap.Round))
 		}
+	}
+}
+
+// --- device picker -----------------------------------------------------------
+
+/**
+ * Every kit in range with its name, MAC and signal, strongest first — the
+ * vendor app's device list. The remembered kit is marked; tapping any row
+ * connects to it and remembers it.
+ */
+@Composable
+private fun DeviceSheet(state: CardiState, onPick: (String) -> Unit) {
+	val remembered = CardiController.rememberedAddress
+	SheetTitle("Choose your lights")
+	Text(
+		if (state.discovering) "Scanning for kits nearby…"
+		else if (state.foundKits.isEmpty()) "No kits found. Is the car on and the app closed elsewhere?"
+		else "Tap a kit to connect.",
+		style = MaterialTheme.typography.bodyMedium,
+		color = MaterialTheme.colorScheme.onSurfaceVariant,
+	)
+	state.foundKits.forEach { kit ->
+		ToggleButton(
+			checked = kit.address == remembered,
+			onCheckedChange = { onPick(kit.address) },
+			shapes = pillShapes(),
+			colors = tileColors(),
+			modifier = Modifier
+				.fillMaxWidth()
+				.heightIn(min = 64.dp),
+		) {
+			Column(Modifier.weight(1f)) {
+				Text(
+					kit.name ?: "Unnamed kit",
+					style = MaterialTheme.typography.titleMedium,
+				)
+				Text(
+					kit.address + if (kit.address == remembered) "  ·  last used" else "",
+					style = MaterialTheme.typography.bodySmall,
+					color = MaterialTheme.colorScheme.onSurfaceVariant,
+				)
+			}
+			Text(
+				"${kit.rssi} dBm",
+				style = MaterialTheme.typography.labelMedium,
+				color = MaterialTheme.colorScheme.onSurfaceVariant,
+			)
+		}
+	}
+	if (!state.discovering) {
+		ToggleButton(
+			checked = false,
+			onCheckedChange = { CardiController.startDiscovery() },
+			shapes = pillShapes(),
+			colors = tileColors(),
+			modifier = Modifier
+				.fillMaxWidth()
+				.height(52.dp),
+		) {
+			Text("Scan again", style = MaterialTheme.typography.labelLarge)
+		}
+	}
+}
+
+// --- settings ----------------------------------------------------------------
+
+@Composable
+private fun SettingsSheet(state: CardiState) {
+	SheetTitle("Settings")
+
+	GroupLabel("Lights")
+	val address = state.deviceAddress ?: CardiController.rememberedAddress
+	Text(
+		if (address == null) "No kit remembered yet."
+		else "${state.deviceName ?: "Kit"}  ·  $address",
+		style = MaterialTheme.typography.bodyLarge,
+	)
+	if (address != null && state.connection == Connection.DISCONNECTED) {
+		ToggleButton(
+			checked = false,
+			onCheckedChange = { CardiController.forget() },
+			shapes = pillShapes(),
+			colors = tileColors(),
+			modifier = Modifier
+				.fillMaxWidth()
+				.height(52.dp),
+		) {
+			Text("Forget this kit", style = MaterialTheme.typography.labelLarge)
+		}
+	}
+
+	GroupLabel("Lock code")
+	Text(
+		"Lock stops your lights following other Cardi cars nearby. Decode undoes " +
+			"it. The lights end on red or green — pick your colour again after.",
+		style = MaterialTheme.typography.bodySmall,
+		color = MaterialTheme.colorScheme.onSurfaceVariant,
+	)
+	KnockButton(state, "lock", "Lock code")
+	KnockButton(state, "decode", "Decode")
+}
+
+/**
+ * First tap arms, a second tap within three seconds sends. Both change a
+ * setting the kit keeps, so a stray tap shouldn't fire one.
+ */
+@Composable
+private fun KnockButton(state: CardiState, which: String, label: String) {
+	var armedAt by remember { mutableLongStateOf(0L) }
+	val armed = armedAt != 0L
+	LaunchedEffect(armedAt) {
+		if (armedAt != 0L) {
+			kotlinx.coroutines.delay(3_000)
+			armedAt = 0L
+		}
+	}
+	val enabled = state.isConnected && state.knock == null
+	ToggleButton(
+		checked = armed,
+		enabled = enabled,
+		onCheckedChange = {
+			if (armed) {
+				armedAt = 0L
+				if (which == "lock") CardiController.sendLockCode() else CardiController.sendDecode()
+			} else {
+				armedAt = System.currentTimeMillis()
+			}
+		},
+		shapes = pillShapes(),
+		colors = tileColors(),
+		modifier = Modifier
+			.fillMaxWidth()
+			.height(52.dp),
+	) {
+		Text(
+			when {
+				state.knock == which -> "Sending…"
+				armed -> "Tap again to confirm"
+				!state.isConnected -> "$label (connect first)"
+				else -> label
+			},
+			style = MaterialTheme.typography.labelLarge,
+		)
 	}
 }

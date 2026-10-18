@@ -3,10 +3,14 @@ package ink.harsh.opencardi.ble
 import android.content.Context
 import android.content.SharedPreferences
 import ink.harsh.opencardi.protocol.Commands
+import ink.harsh.opencardi.protocol.Sequences
 import ink.harsh.opencardi.protocol.Zones
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,7 +30,15 @@ object CardiController {
 
 	private var client: CardiClient? = null
 	private var prefs: SharedPreferences? = null
-	private var triedDirectConnect = false
+
+	// True from the moment the user picks a kit until they press disconnect.
+	// While it holds, any drop is treated like the vendor app treats it: the kit
+	// resets on colour changes in some power states and is advertising again
+	// within half a second, so reconnect straight away.
+	@Volatile private var wantConnected = false
+	private var reconnectJob: Job? = null
+	private var reconnectAttempt = 0
+	private val reconnectDelaysMs = longArrayOf(300, 700, 1_500, 3_000, 5_000)
 
 	private const val PREFS = "open-cardi"
 	private const val KEY_ADDRESS = "device-address"
@@ -50,32 +62,7 @@ object CardiController {
 		client = CardiClient(
 			context = app,
 			scope = scope,
-			onConnection = { connection, device ->
-				// A remembered address that never answers means the kit is not
-				// where we left it — or is not responding at all. Fall back to
-				// a scan once before giving up.
-				if (connection == Connection.DISCONNECTED && triedDirectConnect) {
-					triedDirectConnect = false
-					client?.scanAndConnect()
-				}
-				_state.update {
-					it.copy(
-						connection = connection,
-						deviceName = device?.name ?: it.deviceName,
-						deviceAddress = device?.address ?: it.deviceAddress,
-					)
-				}
-				if (connection == Connection.CONNECTED && device != null) {
-					prefs?.edit()?.putString(KEY_ADDRESS, device.address)?.apply()
-					// Push our zone outward on every connect. Without this the
-					// kit keeps whatever zone it was last told about, so colour
-					// writes landed on the footwell no matter what the phone
-					// was showing.
-					Zones.byId(_state.value.zoneId)?.let { zone ->
-						client?.send("zone", Commands.selectZone(zone.value))
-					}
-				}
-			},
+			onConnection = { connection, device -> onLinkChange(connection, device) },
 			onNotify = ::applyNotify,
 		)
 	}
@@ -83,33 +70,132 @@ object CardiController {
 	/** Address of the last kit we connected to, if any. */
 	val rememberedAddress: String? get() = prefs?.getString(KEY_ADDRESS, null)
 
-	/**
-	 * Reconnect silently if we know the kit, otherwise scan.
-	 *
-	 * A direct connect to a remembered address that is not answering burns
-	 * thirty seconds before the stack gives up with GATT_CONNECTION_TIMEOUT, so
-	 * a failure falls back to scanning rather than retrying the same address.
-	 */
-	fun connect() {
-		val c = client ?: return
-		val known = rememberedAddress
-		if (known != null) {
-			triedDirectConnect = true
-			c.connect(known)
-		} else {
-			triedDirectConnect = false
-			c.scanAndConnect()
+	private fun onLinkChange(connection: Connection, device: android.bluetooth.BluetoothDevice?) {
+		when (connection) {
+			Connection.CONNECTED -> {
+				reconnectAttempt = 0
+				_state.update {
+					it.copy(
+						connection = Connection.CONNECTED,
+						deviceName = device?.name ?: it.deviceName,
+						deviceAddress = device?.address ?: it.deviceAddress,
+					)
+				}
+				device?.let { prefs?.edit()?.putString(KEY_ADDRESS, it.address)?.apply() }
+				// The app's zone wins, as in the vendor app: push it on every
+				// connect. The kit's own zone report is only logged (see
+				// applyNotify) — adopting it raced this write and left the
+				// screen on one zone while colours went to another.
+				Zones.byId(_state.value.zoneId)?.let { zone ->
+					client?.send("zone", Commands.selectZone(zone.value))
+				}
+			}
+			Connection.DISCONNECTED -> {
+				val address = rememberedAddress
+				if (wantConnected && address != null) {
+					_state.update { it.copy(connection = Connection.RECONNECTING) }
+					scheduleReconnect(address)
+				} else {
+					_state.update { it.copy(connection = Connection.DISCONNECTED) }
+				}
+			}
+			Connection.CONNECTING -> _state.update {
+				it.copy(
+					// Keep showing "Reconnecting…" through each retry.
+					connection = if (wantConnected && reconnectAttempt > 0) Connection.RECONNECTING
+					else Connection.CONNECTING,
+					deviceName = device?.name ?: it.deviceName,
+					deviceAddress = device?.address ?: it.deviceAddress,
+				)
+			}
+			else -> _state.update { it.copy(connection = connection) }
 		}
 	}
 
-	fun forgetAndRescan() {
-		prefs?.edit()?.remove(KEY_ADDRESS)?.apply()
-		client?.scanAndConnect()
+	private fun scheduleReconnect(address: String) {
+		reconnectJob?.cancel()
+		val wait = reconnectDelaysMs[minOf(reconnectAttempt, reconnectDelaysMs.lastIndex)]
+		reconnectAttempt++
+		android.util.Log.i("CardiWire", "link lost — reconnecting in ${wait}ms (attempt $reconnectAttempt)")
+		reconnectJob = scope.launch {
+			delay(wait)
+			if (wantConnected) client?.connect(address)
+		}
+	}
+
+	/**
+	 * Connect to the remembered kit. Called when the service starts — including
+	 * from Android Auto, where there is no picker. Without a remembered kit
+	 * this does nothing; the phone UI opens the picker instead.
+	 */
+	fun connect() {
+		val known = rememberedAddress ?: return
+		if (_state.value.connection == Connection.CONNECTED ||
+			_state.value.connection == Connection.CONNECTING
+		) return
+		wantConnected = true
+		reconnectAttempt = 0
+		client?.connect(known)
+	}
+
+	/** The user picked a kit from the list. */
+	fun choose(address: String) {
+		stopDiscovery()
+		prefs?.edit()?.putString(KEY_ADDRESS, address)?.apply()
+	}
+
+	/** Scan for kits in range and list them in [CardiState.foundKits]. */
+	fun startDiscovery() {
+		_state.update { it.copy(foundKits = emptyList(), discovering = true) }
+		client?.discover(
+			onFound = { kit ->
+				_state.update { s ->
+					s.copy(
+						foundKits = (s.foundKits.filterNot { it.address == kit.address } + kit)
+							.sortedByDescending { it.rssi },
+					)
+				}
+			},
+			onDone = { _state.update { it.copy(discovering = false) } },
+		)
+	}
+
+	fun stopDiscovery() {
+		client?.stopDiscovery()
+		_state.update { it.copy(discovering = false) }
 	}
 
 	fun disconnect() {
+		wantConnected = false
+		reconnectJob?.cancel()
+		reconnectAttempt = 0
 		client?.disconnect()
 		_state.update { it.copy(connection = Connection.DISCONNECTED) }
+	}
+
+	/** Drop the remembered kit, so the next Connect shows the picker. */
+	fun forget() {
+		prefs?.edit()?.remove(KEY_ADDRESS)?.apply()
+		_state.update { it.copy(deviceName = null, deviceAddress = null) }
+	}
+
+	// --- lock code / decode --------------------------------------------------
+
+	fun sendLockCode() = runKnock("lock")
+
+	fun sendDecode() = runKnock("decode")
+
+	private fun runKnock(which: String) {
+		val c = client ?: return
+		if (!_state.value.isConnected || _state.value.knock != null) return
+		_state.update { it.copy(knock = which) }
+		scope.launch {
+			val frames = if (which == "lock") Sequences.lockCode() else Sequences.decode()
+			android.util.Log.i("CardiWire", "$which: sending ${frames.size} frames")
+			val ok = c.sendSequence(frames)
+			android.util.Log.i("CardiWire", "$which: ${if (ok) "done" else "interrupted"}")
+			_state.update { it.copy(knock = null, masterOn = if (ok) true else it.masterOn) }
+		}
 	}
 
 	/** Last applied colour, so reopening the app does not reset to white. */
@@ -296,15 +382,10 @@ object CardiController {
 			u.size == 4 && u[0] == 0x33 && u[3] == 0x34 ->
 				_state.update { it.copy(masterOn = u[2] == 0xF0) }
 
-			// 0B <zone> A1 B0 — zone readback. The K3 reports values the phone
-			// does not offer (it answered 3 = Doors, a K4-only zone), and
-			// accepting those left zoneId pointing at something the carousel
-			// cannot show while colour writes went to whatever zone was last
-			// selected on the wire. Only adopt a zone we can actually display.
+			// 0B <zone> A1 B0 — zone readback. Logged, not adopted: the app's
+			// zone wins and is pushed on connect (see onLinkChange).
 			u.size == 4 && u[0] == 0x0B && u[3] == 0xB0 ->
-				Zones.byValue(u[1])
-					?.takeUnless { it.k4Only }
-					?.let { z -> _state.update { it.copy(zoneId = z.id) } }
+				android.util.Log.i("CardiWire", "kit reports zone ${u[1]}")
 		}
 	}
 }
