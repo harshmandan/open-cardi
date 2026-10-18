@@ -6,12 +6,40 @@
 
 </div>
 
-A beautiful web-app replacement for the **Cardi Tech** Android app ([`com.qc.xq`](https://play.google.com/store/apps/details?id=com.qc.xq)) — controls Cardi K3 / K4 Active Ultra (and other ConSmart-family) RGB ambient lighting kits from any Chromium browser. open-cardi reverse-engineers the same BLE protocol — no Android, no ads, no tracking.
+An open-source replacement for the **Cardi Tech** Android app ([`com.qc.xq`](https://play.google.com/store/apps/details?id=com.qc.xq)) — controls Cardi K3 / K4 Active Ultra (and other ConSmart-family) RGB ambient lighting kits. open-cardi reverse-engineers the same BLE protocol — no ads, no tracking.
 
 <img src="./static/preview.png" alt="app-preview" width="600" />
 
-- Website: **[opencardi.harsh.ink](https://opencardi.harsh.ink)**
+- **Android app (recommended):** download the APK from [Releases](https://github.com/harshmandan/open-cardi/releases). Works on the phone and on Android Auto.
+- Web app: [opencardi.harsh.ink](https://opencardi.harsh.ink) — **not recommended**, see below.
 - Writeup: [Reverse-engineering the Cardi Tech BLE protocol](https://harsh.ink/blog/reverse-engineering-cardi-tech)
+
+## Use the Android app, not the web app
+
+The web app can lock the kit into a blinking white/blue state that no app can reach. The only way out is a power cycle, then setting a colour from the vendor app. The Android app can't cause this.
+
+What happens: with the car on and the headlamps on AUTO, the kit sometimes resets when colours change — with any app, including the vendor's. Normally it comes straight back. But if the Bluetooth link was set up with a large packet size (ATT MTU), the reset leaves it stuck in the blink.
+
+- The vendor app and the open-cardi Android app keep the default packet size (23 bytes). The kit always recovers.
+- **Chrome asks for the largest packet size (517) on every Web Bluetooth connection, and the kit agrees to 131.** A web page can't change or prevent this ([W3C issue #383](https://github.com/WebBluetoothCG/web-bluetooth/issues/383)). We've seen the same 131 from Chrome on Android and from macOS; other platforms are untested.
+
+We confirmed it on 2026-10-18 with the same Android build, switching only the packet size: at 23 the kit recovered from every reset; at 131 it locked within 6 seconds. The bisection is written up in the commit that changed the Android app (`feat(android): connect like the vendor app…`); `debug/btsnoop.py` decodes the phone's Bluetooth log if you want to check your own kit.
+
+The web app stays online for reference and for kits that don't reset, but use it at your own risk.
+
+## Android app
+
+Native Kotlin (`android/`), with an Android Auto screen. It connects the way the vendor app does (default packet size, normal connection interval), reconnects on its own if the kit resets, lists nearby kits by name and MAC to choose from, and has Lock code / Decode under Settings.
+
+Build it yourself:
+
+```sh
+cd android
+./gradlew :app:assembleRelease   # app/build/outputs/apk/release/app-release.apk
+./gradlew :protocol:test         # shared byte contract with the web app
+```
+
+Android Auto only lists non-debuggable apps, so sideloaded testing needs the release build.
 
 ## How it works
 
@@ -32,13 +60,13 @@ Decoded ops (from decompiling two vendor apps — Cardi Tech 1.20 and Cardi-RGBW
 | decode          | green + 5× master off/on     | undo lock code (\*)                              |
 | version query   | `1E 00 E1`                   | reply `0C …`, version in byte 4 — K3 ignores it  |
 
-(\*) Lock code and Decode have no opcode of their own: the firmware recognises a colour followed by five master off/on pairs, 200 ms apart. Open-cardi sends them from **More → Lock code**, and caps master writes at 4 per 2.5 s so the power button can't send one by accident. That they stop cross-car colour changes is inferred from the vendor's naming (锁码 / 解码), not yet confirmed.
+(\*) Lock code and Decode have no opcode of their own: the firmware recognises a colour followed by five master off/on pairs, 200 ms apart. Open-cardi sends them from **Settings** (Android) or **More → Lock code** (web), and caps master writes at 4 per 2.5 s so the power button can't send one by accident. That they stop cross-car colour changes is inferred from the vendor's naming (锁码 / 解码), not yet confirmed.
 
-The `CardiClient` (`src/lib/ble/client.ts`) sends a two-frame handshake on connect (`3C AA AA 3D` state, `0E AA E0` zone), then everything else is fire-and-forget writes — no ACKs, no flow control. State is mirrored locally so reconnects can re-apply the last snapshot.
+Both clients send a two-frame handshake on connect (`3C AA AA 3D` state, `0E AA E0` zone), then everything else is fire-and-forget writes — no ACKs, no flow control. State is mirrored locally so reconnects can re-apply the last snapshot.
 
 K3 only has 2 effective zones (front-strip + footwell); K4 exposes 8. The UI hides K4-only zones behind a toggle.
 
-## Stack
+## Web app stack
 
 SvelteKit 5 (runes) · TypeScript · Tailwind v4 · Bun · Web Bluetooth · `navigator.bluetooth.requestDevice` filtered by service `0xFFF0` + name prefixes (`CarDiLits`, `iLits`, `BaoYin`, …). Served as a PWA so it installs on Android home screen; iOS needs [Bluefy](https://apps.apple.com/us/app/bluefy-web-ble-browser/id1492822055) because Safari has no Web Bluetooth.
 
@@ -50,7 +78,7 @@ By BLE name prefix (all share the ConSmart-family firmware on service `0xFFF0`):
 
 Tested end-to-end on Cardi K3 / K4 Active Ultra. If your kit advertises a different prefix, see **Debug** below.
 
-## Develop
+## Develop (web app)
 
 ```sh
 bun install
