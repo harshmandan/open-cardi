@@ -26,7 +26,7 @@
 	function label(action: Action) {
 		if (controls.knock === action) return 'sending…';
 		if (armed === action) return 'tap to confirm';
-		return action === 'lock' ? 'lock code' : 'decode';
+		return action === 'lock' ? 'lock' : 'unlock';
 	}
 </script>
 
@@ -44,13 +44,13 @@
 						armed === action ? 'border-foreground/60' : 'border-foreground/15'
 					]}
 				>
-					<span class="inline-block text-center" style="min-width: 11ch">{label(action)}</span>
+					<span class="inline-block text-center" style="min-width: 8ch">{label(action)}</span>
 				</button>
 			{/each}
 		</div>
 	</div>
 	<p class="text-12 opacity-50">
-		Lock stops your lights following other Cardi cars nearby. Decode undoes it. The lights end on
+		Lock stops your lights following other Cardi cars nearby. Unlock undoes it. The lights end on
 		red or green; pick your colour again after.
 	</p>
 </div>
