@@ -16,6 +16,7 @@ import android.bluetooth.le.ScanSettings
 import android.content.Context
 import android.os.ParcelUuid
 import android.util.Log
+import ink.harsh.opencardi.protocol.Commands
 import ink.harsh.opencardi.protocol.DEVICE_NAME_PREFIXES
 import ink.harsh.opencardi.protocol.HANDSHAKE_WRITES
 import ink.harsh.opencardi.protocol.NOTIFY_CHARACTERISTIC
@@ -68,6 +69,7 @@ private val CCCD: UUID = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 private const val MIN_INTERVAL_MS = 100L
 
 private const val WRITE_ACK_TIMEOUT_MS = 500L
+private const val HEARTBEAT_MS = 3_000L
 
 /**
  * GATT client for ConSmart-family kits. Port of `src/lib/ble/client.ts`, with
@@ -96,6 +98,14 @@ class CardiClient(
 	private var writeAck: CompletableDeferred<Boolean>? = null
 	private var connectedAt = 0L
 	private var rssiJob: kotlinx.coroutines.Job? = null
+
+	// Heartbeat: ask for master state every few seconds and log when the kit
+	// stops answering. The kit has no "I'm stuck" message, so otherwise the log
+	// shows writes going into a void with no way to tell which one wedged it.
+	// Any 33 … 34 reply counts as alive, whoever asked for it.
+	private var heartbeatJob: kotlinx.coroutines.Job? = null
+	@Volatile private var heartbeatPendingSince = 0L
+	@Volatile private var heartbeatMisses = 0
 
 	// --- scanning -----------------------------------------------------------
 
@@ -187,6 +197,7 @@ class CardiClient(
 		stopScan()
 		rssiJob?.cancel()
 		rssiJob = null
+		stopHeartbeat()
 		connectedAt = 0
 		gatt?.close()
 		gatt = null
@@ -271,6 +282,7 @@ class CardiClient(
 					Log.w(WIRE, "link: $state after $uptime — ${gattStatus(status)}")
 					connectedAt = 0
 					writeChar = null
+					stopHeartbeat()
 					onConnection(Connection.DISCONNECTED, g.device)
 				}
 			}
@@ -337,11 +349,9 @@ class CardiClient(
 			}
 
 			scope.launch {
-				// Replay the official app's connect handshake. The first write
-				// doubles as a state query whose reply seeds master/zone.
-				// captures/PROTOCOL_v1.md flags 18/17/16 as undecoded and a
-				// suspect for the stuck-flicker mode, so each step is logged
-				// with how long the kit took to acknowledge it.
+				// Replay the vendor app's connect handshake. The first write
+				// doubles as a state query whose reply seeds master/zone. Each
+				// step is logged with how long the kit took to acknowledge it.
 				Log.i(WIRE, "handshake: begin (${HANDSHAKE_WRITES.size} steps)")
 				HANDSHAKE_WRITES.forEachIndexed { i, w ->
 					val started = System.currentTimeMillis()
@@ -365,6 +375,7 @@ class CardiClient(
 						gatt?.readRemoteRssi()
 					}
 				}
+				startHeartbeat()
 			}
 		}
 
@@ -385,7 +396,53 @@ class CardiClient(
 			value: ByteArray,
 		) {
 			Log.i(WIRE, "← ${hex(value)}")
+			if (value.size == 4 && value[0] == 0x33.toByte() && value[3] == 0x34.toByte()) {
+				heartbeatAnswered()
+			}
 			onNotify(value)
 		}
+	}
+
+	// --- heartbeat ----------------------------------------------------------
+
+	private fun startHeartbeat() {
+		stopHeartbeat()
+		heartbeatJob = scope.launch {
+			while (true) {
+				delay(HEARTBEAT_MS)
+				if (writeChar == null) break
+				val now = System.currentTimeMillis()
+				if (heartbeatPendingSince != 0L) {
+					heartbeatMisses += 1
+					Log.w(
+						WIRE,
+						"heartbeat: no reply ($heartbeatMisses in a row, " +
+							"silent ${now - heartbeatPendingSince}ms)",
+					)
+				} else {
+					heartbeatPendingSince = now
+				}
+				send("heartbeat", Commands.getLightData())
+			}
+		}
+	}
+
+	private fun stopHeartbeat() {
+		heartbeatJob?.cancel()
+		heartbeatJob = null
+		heartbeatPendingSince = 0L
+		heartbeatMisses = 0
+	}
+
+	private fun heartbeatAnswered() {
+		if (heartbeatMisses > 0 && heartbeatPendingSince != 0L) {
+			Log.i(
+				WIRE,
+				"heartbeat: kit answered again after " +
+					"${System.currentTimeMillis() - heartbeatPendingSince}ms",
+			)
+		}
+		heartbeatPendingSince = 0L
+		heartbeatMisses = 0
 	}
 }
