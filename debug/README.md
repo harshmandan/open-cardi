@@ -98,6 +98,37 @@ ka on                         keepalive — re-emit last color every 8s
 q                             disconnect and quit
 ```
 
+## Replaying a crash
+
+`replay` resends the writes from a wire log saved in the web app, with the
+original spacing. It checks the kit is alive by _reading_ FFE1 once a second
+(no command reaches the kit's parser), and logs `READ FAILED` when it stops
+answering.
+
+```sh
+debug/macos-ble.sh replay captures/session-5-web-2026-10-18-night.log \
+  --since 22:33:22 --until 22:33:47
+debug/macos-ble.sh replay <log> --skip-queries   # drop 3C AA AA 3D heartbeats
+```
+
+`--since` should start after the logged handshake; `connect` sends its own.
+
+## Reading an Android Bluetooth capture
+
+1. Developer options → **Enable Bluetooth HCI snoop log** → Full, then toggle
+   Bluetooth off and on.
+2. Reproduce, noting the phone's clock times.
+3. Plug in with USB debugging on, then
+   `adb bugreport out.zip` and
+   `unzip -j out.zip FS/data/misc/bluetooth/logs/btsnoop_hci.log`.
+   (The log folder itself needs root; the bug report is the only way in.)
+4. `python3 debug/btsnoop.py btsnoop_hci.log --handle 0x040 --since 22:33`
+
+`btsnoop.py` prints ATT writes and notifies with labels, connection-parameter
+changes, and disconnect reasons — `0x08 supervision timeout` means the kit went
+silent. Use the `LINK connected` lines to find the kit's handle; other devices
+(watch, earbuds) share the log.
+
 ## Checks still to run on a K3
 
 These came from the Cardi-RGBW 1.2.2 decompile and haven't been tried on the

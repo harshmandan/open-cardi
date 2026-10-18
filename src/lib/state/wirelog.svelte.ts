@@ -132,19 +132,36 @@ export function exportLog(): string {
 	return header + buffer.map(fmt).join('\n') + '\n';
 }
 
-export function downloadLog() {
+export async function downloadLog() {
 	if (!browser) return;
 	const text = exportLog();
-	const blob = new Blob([text], { type: 'text/plain' });
-	const url = URL.createObjectURL(blob);
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient timestamp for the download filename
+	const name = `open-cardi-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+
+	// On phones, hand the file to the share sheet (Files, Drive, chat apps).
+	// Android Chrome's anchor download was failing silently.
+	const file = new File([text], name, { type: 'text/plain' });
+	const isTouch = matchMedia('(pointer: coarse)').matches;
+	if (isTouch && navigator.canShare?.({ files: [file] })) {
+		try {
+			await navigator.share({ files: [file], title: name });
+			return;
+		} catch (err) {
+			if (err instanceof DOMException && err.name === 'AbortError') return;
+			// Fall through to a plain download.
+		}
+	}
+
+	const url = URL.createObjectURL(file);
 	const a = document.createElement('a');
 	a.href = url;
-	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- transient timestamp for the download filename
-	a.download = `open-cardi-log-${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+	a.download = name;
 	document.body.appendChild(a);
 	a.click();
 	a.remove();
-	setTimeout(() => URL.revokeObjectURL(url), 100);
+	// Android Chrome starts the download asynchronously; revoking the URL
+	// right away (this used to wait 100 ms) cancels it without any error.
+	setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export function clearLog() {
