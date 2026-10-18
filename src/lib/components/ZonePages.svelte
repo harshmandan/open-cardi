@@ -11,6 +11,8 @@
 	let scroller: HTMLDivElement;
 	let scrollFraction = $state(0);
 	let cellWidth = $state(220);
+	// The last zone a swipe selected, so the follow-effect below leaves swipes alone.
+	let swipedTo: ZoneId | null = null;
 
 	function onScroll() {
 		if (!scroller) return;
@@ -40,6 +42,24 @@
 		return () => mq.removeEventListener('change', updateCell);
 	});
 
+	// Follow zone changes that didn't come from a swipe — chiefly the kit
+	// reporting its selected zone on connect. Without this the pager kept
+	// showing the old page while colours went to the kit's zone, and the next
+	// swipe sent a zone write for the page that was already on screen. Jump
+	// instantly: a smooth scroll passes through the pages in between, and the
+	// observer below would send a zone write for each.
+	$effect(() => {
+		const id = controls.activeZone;
+		if (id === swipedTo) return;
+		const idx = visibleZones.findIndex((z) => z.id === id);
+		if (!scroller || idx < 0) return;
+		const w = scroller.clientWidth;
+		if (w <= 0) return;
+		if (Math.round(scroller.scrollLeft / w) !== idx) {
+			scroller.scrollTo({ left: idx * w, behavior: 'instant' });
+		}
+	});
+
 	// Re-observe pages whenever the visible zone list changes (toggle show-all).
 	$effect(() => {
 		// eslint-disable-next-line @typescript-eslint/no-unused-expressions -- read to register $effect dependency
@@ -52,7 +72,10 @@
 					.sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
 				if (visible) {
 					const id = (visible.target as HTMLElement).dataset.zone as ZoneId;
-					if (id && id !== controls.activeZone) selectZone(id);
+					if (id && id !== controls.activeZone) {
+						swipedTo = id;
+						selectZone(id);
+					}
 				}
 			},
 			{ root: scroller, threshold: [0.5, 0.75, 1] }
