@@ -23,15 +23,16 @@ val DEVICE_NAME_PREFIXES = listOf(
 
 /**
  * Replayed verbatim on every connect, 100 ms apart. The kit does not require it,
- * but the official app always sends it and the first write doubles as a state
- * query whose replies seed our local state.
+ * but the vendor apps always send it and the replies seed our local state.
+ *
+ * Matches the Cardi-RGBW 1.2.2 vendor app: master/state query, zone query,
+ * firmware-version query. The older Cardi Tech app also sent 18/17/16 —
+ * fragrance and air-purifier queries a lights-only kit has no use for.
  */
 val HANDSHAKE_WRITES: List<ByteArray> = listOf(
 	byteArrayOf(0x3C, 0xAA.toByte(), 0xAA.toByte(), 0x3D),
 	byteArrayOf(0x0E, 0xAA.toByte(), 0xE0.toByte()),
-	byteArrayOf(0x18, 0x00, 0x81.toByte()),
-	byteArrayOf(0x17, 0x00, 0x71),
-	byteArrayOf(0x16, 0x00, 0x61),
+	byteArrayOf(0x1E, 0x00, 0xE1.toByte()),
 )
 
 data class Zone(

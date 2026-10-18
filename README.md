@@ -17,7 +17,7 @@ A beautiful web-app replacement for the **Cardi Tech** Android app ([`com.qc.xq`
 
 The kit's MCU is a Beken BK343x exposing a single GATT service (`0xFFF0`) with a write characteristic (`0xFFE2`, write-without-response) and a notify characteristic (`0xFFE1`). All commands are short framed packets — most are 6 bytes `ED <op> <a> <b> <c> E9`, plus a few odd ones (`FE _ EF` for zone select, `30 _ 03` for speed, `FA _ AF` for app mode).
 
-Decoded ops (from APK decompile + HCI snoop replay):
+Decoded ops (from decompiling two vendor apps — Cardi Tech 1.20 and Cardi-RGBW 1.2.2 — plus HCI snoop replay):
 
 | op              | wire                         | use                                              |
 | --------------- | ---------------------------- | ------------------------------------------------ |
@@ -28,8 +28,13 @@ Decoded ops (from APK decompile + HCI snoop replay):
 | speed           | `30 s 03`                    | 1..100, applies to current pattern               |
 | mic             | `ED 34 m m m E9` / `ED 33 …` | 4 reactive modes (Classic / Soft / Jump / Dance) |
 | app mode        | `FA 01/02 AF`                | Classic vs Starlight rendering on the MCU        |
+| lock code       | red + 5× master off/on       | stop following nearby Cardi controllers (\*)     |
+| decode          | green + 5× master off/on     | undo lock code (\*)                              |
+| version query   | `1E 00 E1`                   | reply `0C …`, firmware version in byte 4         |
 
-The `CardiClient` (`src/lib/ble/client.ts`) does a tiny handshake replay on connect, then everything else is fire-and-forget writes — no ACKs, no flow control. State is mirrored locally so reconnects can re-apply the last snapshot.
+(\*) Lock code and Decode have no opcode of their own: the firmware recognises a colour followed by five master off/on pairs, 200 ms apart. Open-cardi sends them from **More → Lock code**, and caps master writes at 4 per 2.5 s so the power button can't send one by accident. That they stop cross-car colour changes is inferred from the vendor's naming (锁码 / 解码), not yet confirmed.
+
+The `CardiClient` (`src/lib/ble/client.ts`) sends a three-frame handshake on connect (`3C AA AA 3D` state, `0E AA E0` zone, `1E 00 E1` firmware version — the same as the Cardi-RGBW app), then everything else is fire-and-forget writes — no ACKs, no flow control. State is mirrored locally so reconnects can re-apply the last snapshot.
 
 K3 only has 2 effective zones (front-strip + footwell); K4 exposes 8. The UI hides K4-only zones behind a toggle.
 

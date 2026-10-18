@@ -2,6 +2,8 @@
 	import { fly, fade } from 'svelte/transition';
 	import { cubicOut } from 'svelte/easing';
 	import Credits from './Credits.svelte';
+	import KitInfo from './KitInfo.svelte';
+	import LockCodeControl from './LockCodeControl.svelte';
 	import MicModeSelector from './MicModeSelector.svelte';
 	import PatternPicker from './PatternPicker.svelte';
 	import ShowAllZonesToggle from './ShowAllZonesToggle.svelte';
@@ -21,6 +23,8 @@
 			<PatternPicker />
 			<MicModeSelector />
 			<ShowAllZonesToggle />
+			<LockCodeControl />
+			<KitInfo />
 			<div class="flex items-center justify-between">
 				<span class="text-10 font-500 tracking-wider uppercase opacity-50">BLE wire log</span>
 				<button
@@ -66,6 +70,8 @@
 				<PatternPicker />
 				<MicModeSelector />
 				<ShowAllZonesToggle />
+				<LockCodeControl />
+				<KitInfo />
 				<div class="flex items-center justify-between">
 					<span class="text-10 font-500 tracking-wider uppercase opacity-50">BLE wire log</span>
 					<button

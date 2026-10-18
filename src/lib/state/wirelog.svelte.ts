@@ -39,6 +39,7 @@ function inferLabel(bytes: Uint8Array): string {
 		if (b === 0x33) return 'mic_off';
 		if (b === 0x51) return 'music_color';
 		if (b !== undefined && b >= 0x35 && b <= 0x4c && b !== 0x49) return 'pattern';
+		if (b !== undefined && b >= 0x60 && b <= 0x68) return 'pattern_breathing';
 		return 'ed_unknown';
 	}
 	if (a === 0xfe && bytes.length === 3) return 'zone';
@@ -49,9 +50,11 @@ function inferLabel(bytes: Uint8Array): string {
 	if (a === 0xf8 && bytes.length === 3) return 'fragrance';
 	if (a === 0x3c && b === 0xaa) return 'hs_getlight';
 	if (a === 0x0e && b === 0xaa) return 'hs_readzone';
+	if (a === 0x1e && bytes.length === 3) return 'hs_version';
 	if (a === 0x18) return 'hs_18';
 	if (a === 0x17) return 'hs_17';
 	if (a === 0x16) return 'hs_16';
+	if (a === 0xf1 && bytes.length === 6) return 'factory_reset';
 	return 'raw';
 }
 
@@ -70,7 +73,9 @@ function inferRecvLabel(bytes: Uint8Array): string {
 	if (bytes.length === 4 && a === 0x16 && last === 0x61) return 'notify_jhstate';
 	if (bytes.length === 3 && a === 0x39 && last === 0x93) return 'notify_xsrj';
 	if (bytes.length === 18 && a === 0xf9 && last === 0xf8) return 'notify_aes';
-	if (bytes.length === 8 && a === 0x0c) return 'notify_car';
+	// Cardi-RGBW 1.2.2 reads any 0C notify as the firmware-version reply (byte 4).
+	// Cardi Tech 1.20 used the same first byte for its emergency-light readback.
+	if (a === 0x0c) return 'notify_version';
 	// 130-byte all-FF "ready" marker the chip emits after CCCD subscribe.
 	if (bytes.length >= 100 && bytes.every((x) => x === 0xff)) return 'notify_ready';
 	return 'notify_unknown';
