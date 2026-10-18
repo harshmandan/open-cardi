@@ -55,14 +55,14 @@ DEVICE_NAME_PREFIXES = (
     "Flash",
 )
 
-# Init handshake, as sent by the Cardi-RGBW 1.2.2 vendor app. The older Cardi
-# Tech app also sent 18 00 81 / 17 00 71 / 16 00 61 — fragrance and air-purifier
-# state queries a lights-only kit has no use for. `--legacy-handshake` sends
-# those instead, for comparing the two.
+# Init handshake: state query, zone query. The older Cardi Tech app also sent
+# 18 00 81 / 17 00 71 / 16 00 61 — fragrance and air-purifier state queries a
+# lights-only kit has no use for. `--legacy-handshake` sends those too, for
+# comparing. Cardi-RGBW 1.2.2 adds 1E 00 E1 (version), which the K3 ignores;
+# it's available as the `version` command.
 HANDSHAKE_WRITES: list[bytes] = [
     bytes.fromhex("3caaaa3d"),  # getLightData() — master/state query
     bytes.fromhex("0eaae0"),    # readisnewmod() — query current zone
-    bytes.fromhex("1e00e1"),    # firmware version query, reply 0C .. .. .. NN
 ]
 LEGACY_HANDSHAKE_WRITES: list[bytes] = [
     bytes.fromhex("3caaaa3d"),

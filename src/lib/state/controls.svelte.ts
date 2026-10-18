@@ -328,7 +328,8 @@ function applyNotifyToState(data: Uint8Array) {
 		}
 		return;
 	}
-	// 0C .. .. .. NN — reply to the 1E 00 E1 handshake query. Byte 4 is the
+	// 0C .. .. .. NN — reply to 1E 00 E1, if a kit ever sends one (the K3
+	// doesn't, so it's no longer in the handshake). Byte 4 is the
 	// firmware version, which Cardi-RGBW 1.2.2 renders as "V 0.N" below 10 and
 	// as first digit "." remaining digits above.
 	if (data.length >= 5 && data[0] === 0x0c) {

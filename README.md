@@ -30,11 +30,11 @@ Decoded ops (from decompiling two vendor apps — Cardi Tech 1.20 and Cardi-RGBW
 | app mode        | `FA 01/02 AF`                | Classic vs Starlight rendering on the MCU        |
 | lock code       | red + 5× master off/on       | stop following nearby Cardi controllers (\*)     |
 | decode          | green + 5× master off/on     | undo lock code (\*)                              |
-| version query   | `1E 00 E1`                   | reply `0C …`, firmware version in byte 4         |
+| version query   | `1E 00 E1`                   | reply `0C …`, version in byte 4 — K3 ignores it  |
 
 (\*) Lock code and Decode have no opcode of their own: the firmware recognises a colour followed by five master off/on pairs, 200 ms apart. Open-cardi sends them from **More → Lock code**, and caps master writes at 4 per 2.5 s so the power button can't send one by accident. That they stop cross-car colour changes is inferred from the vendor's naming (锁码 / 解码), not yet confirmed.
 
-The `CardiClient` (`src/lib/ble/client.ts`) sends a three-frame handshake on connect (`3C AA AA 3D` state, `0E AA E0` zone, `1E 00 E1` firmware version — the same as the Cardi-RGBW app), then everything else is fire-and-forget writes — no ACKs, no flow control. State is mirrored locally so reconnects can re-apply the last snapshot.
+The `CardiClient` (`src/lib/ble/client.ts`) sends a two-frame handshake on connect (`3C AA AA 3D` state, `0E AA E0` zone), then everything else is fire-and-forget writes — no ACKs, no flow control. State is mirrored locally so reconnects can re-apply the last snapshot.
 
 K3 only has 2 effective zones (front-strip + footwell); K4 exposes 8. The UI hides K4-only zones behind a toggle.
 

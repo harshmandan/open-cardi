@@ -16,15 +16,14 @@ export const DEVICE_NAME_PREFIXES = [
 	'Flash'
 ] as const;
 
-// Matches the Cardi-RGBW 1.2.2 vendor app: master/state query, zone query,
-// firmware-version query (reply `0C …`, version in byte 4). The older Cardi
-// Tech app also sent 18/17/16, which are fragrance and air-purifier queries a
-// lights-only kit has no use for, and which were replayed on every reconnect
-// during the stuck-mode episodes.
+// Master/state query, then zone query. The older Cardi Tech app also sent
+// 18/17/16 — fragrance and air-purifier queries a lights-only kit has no use
+// for, replayed on every reconnect during the stuck-mode episodes. Cardi-RGBW
+// 1.2.2 adds 1E 00 E1 (firmware version), but the K3 never answers it
+// (captures/session-4), so it's left out.
 export const HANDSHAKE_WRITES: readonly Uint8Array[] = [
 	new Uint8Array([0x3c, 0xaa, 0xaa, 0x3d]),
-	new Uint8Array([0x0e, 0xaa, 0xe0]),
-	new Uint8Array([0x1e, 0x00, 0xe1])
+	new Uint8Array([0x0e, 0xaa, 0xe0])
 ];
 
 export const ZONES = [
