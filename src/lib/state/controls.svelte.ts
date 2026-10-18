@@ -233,13 +233,60 @@ async function drainWrites() {
 	}
 }
 
+// Asks the kit for its master state every few seconds while connected and logs
+// when it stops answering. The kit has no "I'm stuck" message, so without this
+// the wire log shows writes going into a void with no way to tell which one
+// wedged it. Any 33 … 34 reply counts as alive, whoever asked for it.
+const HEARTBEAT_MS = 3000;
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let heartbeatPendingSince: number | null = null;
+let heartbeatMisses = 0;
+
+function beat() {
+	if (!client?.connected) return;
+	const now = performance.now();
+	if (heartbeatPendingSince !== null) {
+		heartbeatMisses += 1;
+		logError(
+			`heartbeat: no reply (${heartbeatMisses} in a row, silent ${Math.round(now - heartbeatPendingSince)} ms)`
+		);
+	} else {
+		heartbeatPendingSince = now;
+	}
+	sendCoalesced('heartbeat', cmd.getLightData());
+}
+
+function heartbeatAnswered() {
+	if (heartbeatMisses > 0 && heartbeatPendingSince !== null) {
+		logInfo(
+			`heartbeat: kit answered again after ${Math.round(performance.now() - heartbeatPendingSince)} ms`
+		);
+	}
+	heartbeatPendingSince = null;
+	heartbeatMisses = 0;
+}
+
+function startHeartbeat() {
+	stopHeartbeat();
+	heartbeatTimer = setInterval(beat, HEARTBEAT_MS);
+}
+
+function stopHeartbeat() {
+	if (heartbeatTimer) clearInterval(heartbeatTimer);
+	heartbeatTimer = null;
+	heartbeatPendingSince = null;
+	heartbeatMisses = 0;
+}
+
 function ensureClient(): CardiClient {
 	if (client) return client;
 	client = new CardiClient({
 		onState: (s) => {
 			controls.connection = s;
 			logState(s);
+			if (s === 'connected') startHeartbeat();
 			if (s === 'disconnected') {
+				stopHeartbeat();
 				controls.deviceName = null;
 				controls.firmwareVersion = null;
 				pendingWrites.clear();
@@ -272,6 +319,7 @@ const zoneValue = (id: ZoneId): number => ZONES.find((z) => z.id === id)?.value 
 function applyNotifyToState(data: Uint8Array) {
 	// 33 ?? F0/0F 34 — master on/off readback (reply to getLightData)
 	if (data.length === 4 && data[0] === 0x33 && data[3] === 0x34) {
+		heartbeatAnswered();
 		const next = data[2] === 0xf0;
 		if (controls.masterOn !== next) {
 			controls.masterOn = next;

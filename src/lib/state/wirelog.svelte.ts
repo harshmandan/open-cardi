@@ -1,23 +1,26 @@
 import { browser } from '$app/environment';
 
-export type WireLogKind = 'send' | 'recv' | 'state' | 'error' | 'info';
+export type WireLogKind = 'send' | 'recv' | 'state' | 'error' | 'info' | 'mark';
 
 export type WireLogEntry = {
 	t: number;
+	// Wall-clock ms, so the log can be lined up with a video of the lights.
+	wall: number;
 	kind: WireLogKind;
 	label: string;
 	payload?: string;
 };
 
-const MAX_ENTRIES = 2000;
+// The heartbeat adds ~2 entries every 3 s, so keep a few hours.
+const MAX_ENTRIES = 20000;
 const sessionStart = browser ? performance.now() : 0;
 const buffer: WireLogEntry[] = [];
 
-export const wirelog = $state({ count: 0 });
+export const wirelog = $state({ count: 0, marks: 0 });
 
 function record(kind: WireLogKind, label: string, payload?: string) {
 	const t = browser ? performance.now() - sessionStart : 0;
-	buffer.push({ t, kind, label, payload });
+	buffer.push({ t, wall: Date.now(), kind, label, payload });
 	if (buffer.length > MAX_ENTRIES) buffer.splice(0, buffer.length - MAX_ENTRIES);
 	wirelog.count = buffer.length;
 }
@@ -97,8 +100,21 @@ export function logInfo(message: string) {
 	record('info', message);
 }
 
+// Tapped by the user the moment the lights look wrong, to line up what they saw
+// with what was on the wire.
+export function logMark() {
+	wirelog.marks += 1;
+	record('mark', `>>> USER MARK #${wirelog.marks} <<<`);
+}
+
+const clock = (ms: number) => {
+	const d = new Date(ms);
+	const p = (n: number, w = 2) => String(n).padStart(w, '0');
+	return `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}.${p(d.getMilliseconds(), 3)}`;
+};
+
 function fmt(e: WireLogEntry): string {
-	const ts = `[+${e.t.toFixed(0).padStart(7, '0')}ms]`;
+	const ts = `${clock(e.wall)} [+${e.t.toFixed(0).padStart(7, '0')}ms]`;
 	const kind = e.kind.toUpperCase().padEnd(6);
 	const label = e.label.padEnd(12);
 	return e.payload ? `${ts} ${kind} ${label} ${e.payload}` : `${ts} ${kind} ${label}`;
@@ -134,4 +150,5 @@ export function downloadLog() {
 export function clearLog() {
 	buffer.length = 0;
 	wirelog.count = 0;
+	wirelog.marks = 0;
 }
