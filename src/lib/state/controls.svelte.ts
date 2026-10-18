@@ -1,6 +1,7 @@
 import { browser } from '$app/environment';
 import { CardiClient, type ConnectionState } from '$lib/ble';
 import * as cmd from '$lib/protocol/commands';
+import { decodeSequence, lockCodeSequence, type TimedFrame } from '$lib/protocol/sequences';
 import { ZONES, type ZoneId, type MicModeId } from '$lib/protocol/constants';
 import { pushError } from '$lib/state/notifications.svelte';
 import { logError, logInfo, logRecv, logSend, logState } from '$lib/state/wirelog.svelte';
@@ -111,7 +112,9 @@ export const controls = $state({
 	moreOpen: session.moreOpen ?? false,
 	helpOpen: false,
 	showAllZones: session.showAllZones ?? false,
-	lastNotify: null as Uint8Array | null
+	lastNotify: null as Uint8Array | null,
+	knock: null as 'lock' | 'decode' | null,
+	firmwareVersion: null as string | null
 });
 
 export function toggleMore() {
@@ -156,6 +159,14 @@ const WITH_RESPONSE_KINDS = new Set<string>();
 const MIN_INTERVAL_MS = 100;
 let lastSendAt = 0;
 
+// Lock code and Decode are a colour followed by rapid master off/on toggles
+// (see protocol/sequences.ts), so a user hammering the master switch could
+// send one by accident. Cap master writes well below the knock's rate: the
+// knock needs 11 in ~2.2 s, this allows 4 per 2.5 s.
+const MASTER_WINDOW_MS = 2500;
+const MASTER_MAX_IN_WINDOW = 4;
+const masterSendTimes: number[] = [];
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function sendCoalesced(kind: string, bytes: Uint8Array) {
@@ -195,6 +206,18 @@ async function drainWrites() {
 				// while we were waiting — latest-wins semantics still apply.
 				payload = pendingWrites.get(kind) ?? payload;
 			}
+			if (kind === 'master') {
+				const now = performance.now();
+				while (masterSendTimes.length && now - masterSendTimes[0] > MASTER_WINDOW_MS) {
+					masterSendTimes.shift();
+				}
+				if (masterSendTimes.length >= MASTER_MAX_IN_WINDOW) {
+					await sleep(MASTER_WINDOW_MS - (now - masterSendTimes[0]));
+					masterSendTimes.shift();
+					payload = pendingWrites.get(kind) ?? payload;
+				}
+				masterSendTimes.push(performance.now());
+			}
 			lastSendAt = performance.now();
 
 			pendingWrites.delete(kind);
@@ -218,6 +241,7 @@ function ensureClient(): CardiClient {
 			logState(s);
 			if (s === 'disconnected') {
 				controls.deviceName = null;
+				controls.firmwareVersion = null;
 				pendingWrites.clear();
 			}
 		},
@@ -253,6 +277,19 @@ function applyNotifyToState(data: Uint8Array) {
 			controls.masterOn = next;
 			persistSession();
 			logInfo(`sync master ← device: ${next ? 'on' : 'off'}`);
+		}
+		return;
+	}
+	// 0C .. .. .. NN — reply to the 1E 00 E1 handshake query. Byte 4 is the
+	// firmware version, which Cardi-RGBW 1.2.2 renders as "V 0.N" below 10 and
+	// as first digit "." remaining digits above.
+	if (data.length >= 5 && data[0] === 0x0c) {
+		const n = data[4];
+		const digits = String(n);
+		const v = n < 10 ? `0.${n}` : `${digits[0]}.${digits.slice(1)}`;
+		if (controls.firmwareVersion !== v) {
+			controls.firmwareVersion = v;
+			logInfo(`firmware ← device: v${v}`);
 		}
 		return;
 	}
@@ -316,6 +353,52 @@ export async function setMaster(on: boolean) {
 	controls.masterOn = on;
 	sendCoalesced('master', on ? cmd.masterOn() : cmd.masterOff());
 	persistSession();
+}
+
+// Sends a knock frame by frame, holding the write queue so nothing else lands
+// between frames: the queue's latest-wins coalescing would otherwise collapse
+// the alternating master writes into one.
+async function runKnock(which: 'lock' | 'decode', frames: TimedFrame[]) {
+	if (!client?.connected) {
+		pushError('Connect to the kit first.');
+		return;
+	}
+	if (controls.knock) return;
+	controls.knock = which;
+	try {
+		while (draining) await sleep(20);
+		draining = true;
+		if (colorProbeTimer) {
+			clearTimeout(colorProbeTimer);
+			colorProbeTimer = null;
+		}
+		const gap = MIN_INTERVAL_MS - (performance.now() - lastSendAt);
+		if (gap > 0) await sleep(gap);
+		logInfo(`${which === 'lock' ? 'lock code' : 'decode'}: sending ${frames.length} frames`);
+		for (const f of frames) {
+			if (!client?.connected) throw new Error('Disconnected before the sequence finished.');
+			await client.send(f.bytes);
+			lastSendAt = performance.now();
+			if (f.delayAfterMs) await sleep(f.delayAfterMs);
+		}
+		controls.masterOn = true;
+		persistSession();
+		logInfo(`${which === 'lock' ? 'lock code' : 'decode'}: done`);
+	} catch (err) {
+		pushError(err instanceof Error ? err.message : String(err));
+	} finally {
+		draining = false;
+		controls.knock = null;
+		if (pendingWrites.size > 0) void drainWrites();
+	}
+}
+
+export function sendLockCode() {
+	return runKnock('lock', lockCodeSequence());
+}
+
+export function sendDecode() {
+	return runKnock('decode', decodeSequence());
 }
 
 export async function setColor(rgb: Rgb) {

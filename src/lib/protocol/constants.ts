@@ -16,12 +16,15 @@ export const DEVICE_NAME_PREFIXES = [
 	'Flash'
 ] as const;
 
+// Matches the Cardi-RGBW 1.2.2 vendor app: master/state query, zone query,
+// firmware-version query (reply `0C …`, version in byte 4). The older Cardi
+// Tech app also sent 18/17/16, which are fragrance and air-purifier queries a
+// lights-only kit has no use for, and which were replayed on every reconnect
+// during the stuck-mode episodes.
 export const HANDSHAKE_WRITES: readonly Uint8Array[] = [
 	new Uint8Array([0x3c, 0xaa, 0xaa, 0x3d]),
 	new Uint8Array([0x0e, 0xaa, 0xe0]),
-	new Uint8Array([0x18, 0x00, 0x81]),
-	new Uint8Array([0x17, 0x00, 0x71]),
-	new Uint8Array([0x16, 0x00, 0x61])
+	new Uint8Array([0x1e, 0x00, 0xe1])
 ];
 
 export const ZONES = [
