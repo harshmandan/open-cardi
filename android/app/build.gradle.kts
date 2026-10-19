@@ -28,8 +28,8 @@ android {
 		// no legacy branches. Android Auto needs a recent phone regardless.
 		minSdk = 33
 		targetSdk = 37
-		versionCode = 11
-		versionName = "0.9.2"
+		versionCode = 12
+		versionName = "0.10.0"
 	}
 
 	signingConfigs {
