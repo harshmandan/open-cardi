@@ -1,50 +1,30 @@
 package ink.harsh.opencardi.car
 
 import androidx.car.app.CarContext
-import androidx.car.app.Screen
-import androidx.car.app.model.Action
-import androidx.car.app.model.Header
-import androidx.car.app.model.ItemList
-import androidx.car.app.model.ListTemplate
-import androidx.car.app.model.Row
-import androidx.car.app.model.Template
+import androidx.car.app.model.GridItem
 import ink.harsh.opencardi.ble.CardiController
+import ink.harsh.opencardi.ble.CardiState
 
-/** More colours: [MORE_COLOURS] as a list, each with its swatch. */
+/** Every colour in [MORE_COLOURS]; the lit one says so. */
 class ColorScreen(
 	carContext: CarContext,
 	// Named in the header so it's clear which zone the colour goes to.
 	private val zoneLabel: String,
-) : Screen(carContext) {
+) : EditGridScreen(carContext) {
 
-	override fun onGetTemplate(): Template = guarded(carContext) { template() }
+	override val title get() = "Colour · $zoneLabel"
 
-	private fun template(): Template {
-		val state = CardiController.state.value
-		val current = state.color.takeIf { state.patternIndex == null && state.micMode == null }
-		val items = ItemList.Builder()
-		for ((name, rgb) in MORE_COLOURS.take(carLimit(carContext, LIST))) {
-			items.addItem(
-				Row.Builder()
-					.setTitle(name)
-					// SMALL, not ICON: the host tints icon-type images.
-					.setImage(swatchIcon(rgb, checked = rgb == current), Row.IMAGE_TYPE_SMALL)
-					.setOnClickListener {
-						CardiController.setColor(rgb)
-						confirm(carContext, "$name on $zoneLabel")
-						invalidate()
-					}
-					.build()
-			)
+	override fun watched(state: CardiState) = current(state) ?: Unit
+
+	private fun current(state: CardiState) =
+		state.color.takeIf { state.patternIndex == null && state.micMode == null }
+
+	override fun tiles(state: CardiState): List<GridItem> {
+		val current = current(state)
+		return MORE_COLOURS.map { (name, rgb) ->
+			tile(name, swatchIcon(rgb), SELECTED.takeIf { rgb == current }) {
+				CardiController.setColor(rgb)
+			}
 		}
-		return ListTemplate.Builder()
-			.setHeader(
-				Header.Builder()
-					.setTitle("Colour · $zoneLabel")
-					.setStartHeaderAction(Action.BACK)
-					.build()
-			)
-			.setSingleList(items.build())
-			.build()
 	}
 }

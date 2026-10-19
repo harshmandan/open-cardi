@@ -6,19 +6,15 @@ import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.Header
 import ink.harsh.opencardi.ble.CardiState
-import androidx.car.app.model.TabTemplate
-import androidx.car.app.model.TabContents
-import androidx.car.app.model.Tab
 import androidx.car.app.CarToast
 import ink.harsh.opencardi.R
-import androidx.car.app.model.GridItem
-import androidx.car.app.model.SectionedItemTemplate
-import androidx.car.app.model.GridSection
 import androidx.car.app.model.Row
+import androidx.car.app.model.GridItem
+import androidx.car.app.model.GridSection
 import androidx.car.app.model.RowSection
-import ink.harsh.opencardi.ble.Rgb
-import androidx.car.app.model.CarIcon
+import androidx.car.app.model.SectionedItemTemplate
 import androidx.car.app.model.CarColor
+import androidx.car.app.model.CarIcon
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
 import androidx.core.content.ContextCompat
@@ -34,33 +30,34 @@ import kotlinx.coroutines.flow.drop
 import ink.harsh.opencardi.ble.linkLabel
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The car's home screen: a tab per zone (Overall, Light Guide, Floor). Each
- * tab has the colour grid, brightness steps and a Pattern row that opens the
- * pattern list for that zone; power and Bluetooth are floating buttons on
- * every tab. The tabs stay up while disconnected so the Bluetooth button is always
- * reachable.
+ * The car's home screen: Zone, Colour, Brightness and Pattern rows, each
+ * showing its current value and opening a page to change it. Power and
+ * Bluetooth are floating buttons.
  */
 class RootScreen(carContext: CarContext) : Screen(carContext) {
 
 	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
 	init {
-		// Re-render whenever the kit's state moves, including changes the user
-		// made on the phone or that the device reported back over notify.
 		scope.launch {
-			// Only for what this screen draws: a refresh scrolls the page back
-			// to the top, and a scan would otherwise refresh it for every kit
-			// it saw.
+			// Only for what this screen shows; a scan would otherwise refresh it
+			// for every kit it saw.
 			CardiController.state
 				.map { it.copy(foundKits = emptyList(), favorites = emptyList(), customColors = emptyList(), speed = 0) }
 				.distinctUntilChanged()
 				.drop(1)
-				.collect { invalidate() }
+				// Let a step tap's ripple finish before the redraw replaces it.
+				.collectLatest {
+					delay(RIPPLE_MS)
+					invalidate()
+				}
 		}
-		// The tab bar leaves no room for a title, so say link changes out loud.
+		// The page has no title bar, so say link changes out loud.
 		scope.launch {
 			CardiController.state
 				.map { it.connection to it.deviceName }
@@ -129,160 +126,83 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 			carContext, Manifest.permission.BLUETOOTH_CONNECT
 		) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-	// The tab on screen; selecting one selects that zone on the kit.
-	private var activeTab: String = CardiController.state.value.zoneId
-		.takeIf { it in ZONE_TABS } ?: "overall"
-
 	override fun onGetTemplate(): Template = guarded(carContext) { template() }
 
 	private fun template(): Template {
 		if (!hasBluetoothPermission()) return permissionTemplate()
-
-		val contents = zoneTab(CardiController.state.value)
-
-		return TabTemplate.Builder(object : TabTemplate.TabCallback {
-			override fun onTabSelected(tabContentId: String) {
-				android.util.Log.i("CardiCar", "tab selected: $tabContentId")
-				activeTab = tabContentId
-				if (tabContentId in ZONE_TABS) CardiController.selectZone(tabContentId)
-				invalidate()
-			}
-		})
-			.setHeaderAction(Action.APP_ICON)
-			.addTab(tab("overall", "Overall", R.drawable.ic_car_zone))
-			.addTab(tab("guide", "Light Guide", R.drawable.ic_car_zone_guide))
-			.addTab(tab("floor", "Floor", R.drawable.ic_car_zone_floor))
-			.setTabContents(TabContents.Builder(contents).build())
-			.setActiveTabContentId(activeTab)
-			.build()
+		return home(CardiController.state.value)
 	}
 
 	/**
-	 * A zone tab, as a sectioned template (car API 8). A tappable row heads
-	 * each grid and opens a full page: every colour, 10–100% brightness, every
-	 * pattern. The grids under them hold the quick picks: eight colours, the
-	 * ±1/±5 steps, solid colour and three patterns.
+	 * Home: one row per setting, showing its current value; each opens a
+	 * page to change it. Brightness also has its −5 −1 +1 +5 steps here.
+	 *
+	 * Android Auto 17.8 rebuilds a sectioned page from blank whenever its
+	 * content changes (tested in the DHU), so a step tap redraws this page;
+	 * accepted for brightness. Colour, zone and pattern change on their own
+	 * pages, plain grids that update in place.
 	 */
-	private fun zoneTab(state: CardiState): Template {
-		val zoneLabel = Zones.byId(activeTab)?.label ?: activeTab
-		val current = state.color.takeIf { state.patternIndex == null && state.micMode == null }
-		val colourTitle = when {
-			current == null -> "Colour"
-			else -> "Colour · ${colourName(current) ?: "Custom"}"
-		}
-		val brightnessTitle = "Brightness · ${state.brightness}%"
-		val patternTitle = "Pattern · " + (
-			state.patternIndex?.let { i -> Patterns.list.firstOrNull { it.index == i }?.label }
-				?: "Solid colour"
-			)
-		val openColours = { screenManager.push(ColorScreen(carContext, zoneLabel)) }
-		val openPatterns = { screenManager.push(PatternScreen(carContext, zoneLabel)) }
+	private fun home(state: CardiState): Template {
+		val zone = Zones.byId(state.zoneId)?.label ?: state.zoneId
+		val colour = state.color.takeIf { state.patternIndex == null && state.micMode == null }
+			?.let { colourName(it) ?: "Custom" }
+			?: "—"
+		val pattern = state.patternIndex
+			?.let { i -> Patterns.list.firstOrNull { it.index == i }?.label }
+			?: "Solid colour"
 
-		val template = SectionedItemTemplate.Builder()
-		template.addSection(heading(colourTitle, browsable = true, onClick = openColours))
-		template.addSection(grid(colourTiles(colourGrid(current), current, zoneLabel), circles = true))
-		template.addSection(heading(brightnessTitle, browsable = true) {
-			screenManager.push(BrightnessScreen(carContext, zoneLabel))
-		})
-		template.addSection(grid(stepTiles(state.brightness)))
-		template.addSection(heading(patternTitle, browsable = true, onClick = openPatterns))
-		template.addSection(grid(listOf(solidTile(state, zoneLabel)) + quickPatternTiles(state.patternIndex, zoneLabel)))
-		return template
+		return SectionedItemTemplate.Builder()
+			.setHeader(Header.Builder().setTitle("open-cardi").setStartHeaderAction(Action.APP_ICON).build())
+			.addSection(
+				RowSection.Builder()
+					.addItem(row("Zone", zone, R.drawable.ic_car_zone) { ZoneScreen(carContext) })
+					.addItem(row("Colour", colour, R.drawable.ic_car_colour) { ColorScreen(carContext, zone) })
+					.addItem(row("Brightness", "${state.brightness}%", R.drawable.ic_car_brightness) {
+						BrightnessScreen(carContext, zone)
+					})
+					.build()
+			)
+			.addSection(
+				GridSection.Builder()
+					.setItemSize(GridSection.ITEM_SIZE_SMALL)
+					.setItems(stepTiles(state.brightness))
+					.build()
+			)
+			.addSection(
+				RowSection.Builder()
+					.addItem(row("Pattern", pattern, R.drawable.ic_car_pattern) { PatternScreen(carContext, zone) })
+					.build()
+			)
 			.addAction(powerFab(state))
 			.addAction(bluetoothFab(state))
 			.build()
 	}
 
-	private fun grid(items: List<GridItem>, circles: Boolean = false) =
-		GridSection.Builder()
-			.setItemSize(GridSection.ITEM_SIZE_SMALL)
-			.apply { if (circles) setItemImageShape(GridSection.ITEM_IMAGE_SHAPE_CIRCLE) }
-			.setItems(items)
-			.build()
-
-	// Rows rather than section titles: they can be tapped, and a row's title
-	// is larger and whiter than a section title, so all three match.
-	private fun heading(title: String, browsable: Boolean, onClick: () -> Unit) =
-		RowSection.Builder()
-			.addItem(
-				Row.Builder()
-					.setTitle(title)
-					.setBrowsable(browsable)
-					.setOnClickListener(onClick)
-					.build()
-			)
-			.build()
-
-	private fun tile(title: String, image: CarIcon, onClick: () -> Unit) =
+	// Steps rather than presets: four fit one row and reach any exact value;
+	// the 10–100% presets are on the Brightness page.
+	private fun stepTiles(b: Int) = listOf(-5, -1, 1, 5).map { step ->
 		GridItem.Builder()
-			// A title is required in practice: the library allows an untitled
-			// grid item, but Android Auto 17.8 crashed on one ("A title must be
-			// set on the row").
-			.setTitle(title)
-			// LARGE, not ICON: the host tints icon-type images, which turned
-			// every swatch white.
-			.setImage(image, GridItem.IMAGE_TYPE_LARGE)
-			.setOnClickListener(onClick)
+			// A title is required in practice: Android Auto 17.8 crashed on an
+			// untitled grid item ("A title must be set on the row").
+			.setTitle(if (step > 0) "+$step" else "−${-step}")
+			// LARGE, not ICON: the host tints icon-type images.
+			.setImage(stepIcon(plus = step > 0), GridItem.IMAGE_TYPE_LARGE)
+			.setOnClickListener { CardiController.setBrightness((b + step).coerceIn(1, 100)) }
 			.build()
-
-	// The current colour has a tick drawn into it.
-	private fun colourTiles(palette: List<Pair<String, Rgb>>, current: Rgb?, zoneLabel: String) =
-		palette.map { (name, rgb) ->
-			tile(name, swatchIcon(rgb, checked = rgb == current)) {
-				CardiController.setColor(rgb)
-				confirm(carContext, "$name on $zoneLabel")
-			}
-		}
-
-	// Steps rather than presets: −5 −1 +1 +5 fit one row on a 1280×720 split
-	// screen (four columns) and reach any exact value. Not as row actions:
-	// this host draws only one action per row (the docs say two from car API
-	// 8; tested).
-	private fun stepTiles(b: Int) = BRIGHTNESS_STEPS.map { step ->
-		tile(if (step > 0) "+$step" else "−${-step}", stepIcon(plus = step > 0)) {
-			val next = (b + step).coerceIn(1, 100)
-			CardiController.setBrightness(next)
-			confirm(carContext, "Brightness $next%")
-		}
 	}
 
-	// Eight: six fixed, a slot, White. The slot always shows the
-	// current colour when it isn't one of the fixed seven, so what's lit is
-	// always on screen and ticked; it keeps that colour until another
-	// off-grid one replaces it.
-	private fun colourGrid(current: Rgb?): List<Pair<String, Rgb>> {
-		val fixed = CAR_PALETTE.dropLast(1)
-		val white = CAR_PALETTE.last()
-		if (current != null && (fixed + white).none { it.second == current }) {
-			Recent.colour = (colourName(current) ?: "Custom") to current
-		}
-		return fixed + (Recent.colour ?: COLOUR_SLOT_DEFAULT) + white
-	}
-
-	// Two fixed patterns, then a slot like the colours': Cycle until a
-	// pattern from the list is chosen, then that one. Strobes are never
-	// offered in the car (see PatternScreen).
-	private fun quickPatternTiles(active: Int?, zoneLabel: String): List<GridItem> {
-		if (active != null && active !in FIXED_PATTERNS) Recent.pattern = active
-		return (FIXED_PATTERNS + (Recent.pattern ?: PATTERN_SLOT_DEFAULT)).map { index ->
-			val label = Patterns.list.first { it.index == index }.label
-			tile(SHORT_PATTERN_NAMES[index] ?: label, patternIcon(index, checked = index == active)) {
-				CardiController.setPattern(index)
-				confirm(carContext, "$label on $zoneLabel")
-			}
-		}
-	}
-
-	// Back to a steady colour. Always a plain white disc, whatever the colour.
-	private fun solidTile(state: CardiState, zoneLabel: String) =
-		tile("Solid", swatchIcon(Rgb(255, 255, 255), checked = state.patternIndex == null)) {
-			CardiController.clearPattern()
-			confirm(carContext, "Solid colour on $zoneLabel")
-		}
+	private fun row(title: String, value: String, iconRes: Int, page: () -> Screen) =
+		Row.Builder()
+			.setTitle(title)
+			.addText(value)
+			.setImage(resIcon(carContext, iconRes))
+			.setBrowsable(true)
+			.setOnClickListener { screenManager.push(page()) }
+			.build()
 
 	// Floating buttons. Tested in the DHU (host car API 8): drawn on list and
 	// sectioned templates, including inside tabs, but never on a GridTemplate,
-	// which is why the zone tabs are sectioned rather than a plain grid. The
+	// which is why home is a list and the grid pages have none. The
 	// host restyles them, so the background colour is only what the API
 	// requires, not what shows.
 	private fun powerFab(state: CardiState) =
@@ -301,9 +221,6 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 			.setBackgroundColor(CarColor.BLUE)
 			.setOnClickListener { screenManager.push(DeviceScreen(carContext)) }
 			.build()
-
-	private fun tab(id: String, title: String, iconRes: Int) =
-		Tab.Builder().setContentId(id).setTitle(title).setIcon(resIcon(carContext, iconRes)).build()
 
 	// Google's "grant permissions on phone" flow: a message template with a
 	// primary and a secondary button, a toast pointing at the phone, then
@@ -332,24 +249,4 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 					.build()
 			)
 			.build()
-}
-
-private val ZONE_TABS = setOf("overall", "guide", "floor")
-private val BRIGHTNESS_STEPS = listOf(-5, -1, 1, 5)
-
-// Pattern indexes. The fixed two and the slot's default are guesses at
-// favourites; we don't track which ones are used.
-private val FIXED_PATTERNS = listOf(0, 2)
-private const val PATTERN_SLOT_DEFAULT = 21
-// Tile titles; the full names are cut off at tile width.
-private val SHORT_PATTERN_NAMES = mapOf(
-	0 to "Sweep", 2 to "Breathing", 3 to "Blue", 4 to "Yellow", 5 to "Cyan", 6 to "Pink",
-	7 to "Pulse", 8 to "Red/Green", 9 to "Red/Blue", 10 to "Green/Blue", 19 to "Fast sweep",
-	21 to "Cycle",
-)
-
-// What the grids' slots show, for as long as the app runs.
-private object Recent {
-	var colour: Pair<String, Rgb>? = null
-	var pattern: Int? = null
 }

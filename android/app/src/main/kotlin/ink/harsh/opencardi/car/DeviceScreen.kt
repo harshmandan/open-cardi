@@ -69,7 +69,7 @@ class DeviceScreen(carContext: CarContext) : Screen(carContext) {
 		if (state.isConnected) {
 			val look = state.patternIndex
 				?.let { i -> Patterns.list.firstOrNull { it.index == i }?.label }
-				?: CAR_PALETTE.firstOrNull { it.second == state.color }?.first
+				?: colourName(state.color)
 				?: "Custom colour"
 			pane.addRow(
 				Row.Builder()

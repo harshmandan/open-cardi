@@ -63,9 +63,7 @@ fun stepIcon(plus: Boolean): CarIcon {
 
 // Every link state gets its own look, and none of them move: the car app
 // quality rules forbid animated elements (SA-1), so no flashing or spinning.
-// Scanning for kits counts as searching too. Resources rather than bitmaps:
-// the library never treats two bitmaps as equal (CarIcon.equals), so the
-// host can't tell a bitmap button is unchanged between refreshes.
+// Scanning for kits counts as searching too.
 fun bluetoothIcon(carContext: Context, state: CardiState): CarIcon = when {
 	state.connection == Connection.CONNECTED -> resIcon(carContext, R.drawable.ic_car_fab_bt_connected)
 	state.connection != Connection.DISCONNECTED || state.discovering ->
@@ -73,9 +71,22 @@ fun bluetoothIcon(carContext: Context, state: CardiState): CarIcon = when {
 	else -> resIcon(carContext, R.drawable.ic_car_fab_bt_disabled, CarColor.RED)
 }
 
-/** An icon by resource id; see [bluetoothIcon] for why. */
-fun resIcon(carContext: Context, res: Int, tint: CarColor = CarColor.DEFAULT): CarIcon =
-	CarIcon.Builder(IconCompat.createWithResource(carContext, res)).setTint(tint).build()
+/**
+ * A drawable resource as a car icon, drawn into a bitmap here. Passed by
+ * resource id, the host draws from its own cache of the app's resources, and
+ * after an update that added icons it showed the wrong ones (the Bluetooth
+ * icon on the Colour row, a zone icon on the power button).
+ */
+fun resIcon(carContext: Context, res: Int, tint: CarColor = CarColor.DEFAULT): CarIcon {
+	val bitmap = Bitmap.createBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888)
+	ContextCompat.getDrawable(carContext, res)!!.mutate().apply {
+		setBounds(0, 0, ICON_PX, ICON_PX)
+		draw(Canvas(bitmap))
+	}
+	return CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).setTint(tint).build()
+}
+
+private const val ICON_PX = 96
 
 // [scale] shrinks the tick about the centre, for discs with a ring drawn
 // round the edge, where a full-size tick crowds the ring.
@@ -184,5 +195,22 @@ fun patternIcon(index: Int, checked: Boolean): CarIcon {
 		}
 	}
 	if (checked) drawTick(canvas, tick)
+	return CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).build()
+}
+
+/** A zone tile: [res]'s glyph, white on a dark disc. */
+fun zoneIcon(carContext: Context, res: Int): CarIcon {
+	val bitmap = Bitmap.createBitmap(SWATCH_PX, SWATCH_PX, Bitmap.Config.ARGB_8888)
+	val canvas = Canvas(bitmap)
+	val r = SWATCH_PX / 2f
+	canvas.drawCircle(r, r, r, Paint(Paint.ANTI_ALIAS_FLAG).apply {
+		color = android.graphics.Color.rgb(70, 70, 70)
+	})
+	val inset = (SWATCH_PX * 0.28f).toInt()
+	ContextCompat.getDrawable(carContext, res)!!.mutate().apply {
+		setTint(android.graphics.Color.WHITE)
+		setBounds(inset, inset, SWATCH_PX - inset, SWATCH_PX - inset)
+		draw(canvas)
+	}
 	return CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).build()
 }
