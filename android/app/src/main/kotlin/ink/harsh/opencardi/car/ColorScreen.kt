@@ -27,13 +27,12 @@ class ColorScreen(
 			items.addItem(
 				Row.Builder()
 					.setTitle(name)
-					.apply { if (rgb == current) addText("Selected") }
 					// SMALL, not ICON: the host tints icon-type images.
 					.setImage(swatchIcon(rgb, checked = rgb == current), Row.IMAGE_TYPE_SMALL)
 					.setOnClickListener {
 						CardiController.setColor(rgb)
 						confirm(carContext, "$name on $zoneLabel")
-						screenManager.pop()
+						invalidate()
 					}
 					.build()
 			)

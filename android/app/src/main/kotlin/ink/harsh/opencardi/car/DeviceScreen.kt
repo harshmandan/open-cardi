@@ -75,7 +75,7 @@ class DeviceScreen(carContext: CarContext) : Screen(carContext) {
 				Row.Builder()
 					.setTitle(if (state.masterOn) "Lights on" else "Lights off")
 					.addText("$look · ${state.brightness}%")
-					.setImage(carIcon(carContext, R.drawable.ic_car_power))
+					.setImage(resIcon(carContext, R.drawable.ic_car_power))
 					.build()
 			)
 			pane.setImage(swatchIcon(state.color))
@@ -85,7 +85,7 @@ class DeviceScreen(carContext: CarContext) : Screen(carContext) {
 				Row.Builder()
 					.setTitle("Bluetooth access needed")
 					.addText("Continue on your phone")
-					.setImage(carIcon(carContext, R.drawable.ic_car_bt_disabled))
+					.setImage(resIcon(carContext, R.drawable.ic_car_fab_bt_disabled))
 					.build()
 			)
 		}

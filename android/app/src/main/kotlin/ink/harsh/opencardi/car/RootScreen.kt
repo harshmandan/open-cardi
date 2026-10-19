@@ -287,7 +287,7 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 	// requires, not what shows.
 	private fun powerFab(state: CardiState) =
 		Action.Builder()
-			.setIcon(icon(R.drawable.ic_car_power))
+			.setIcon(resIcon(carContext, R.drawable.ic_car_power))
 			.setBackgroundColor(if (state.masterOn) CarColor.GREEN else CarColor.RED)
 			.setOnClickListener {
 				CardiController.setMaster(!state.masterOn)
@@ -303,9 +303,7 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 			.build()
 
 	private fun tab(id: String, title: String, iconRes: Int) =
-		Tab.Builder().setContentId(id).setTitle(title).setIcon(icon(iconRes)).build()
-
-	private fun icon(res: Int) = carIcon(carContext, res)
+		Tab.Builder().setContentId(id).setTitle(title).setIcon(resIcon(carContext, iconRes)).build()
 
 	// Google's "grant permissions on phone" flow: a message template with a
 	// primary and a secondary button, a toast pointing at the phone, then

@@ -9,6 +9,7 @@ import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import ink.harsh.opencardi.ble.CardiController
+import ink.harsh.opencardi.ble.Rgb
 import ink.harsh.opencardi.protocol.Patterns
 
 /**
@@ -45,11 +46,12 @@ class PatternScreen(
 			list.addItem(
 				Row.Builder()
 					.setTitle("Solid colour")
-					.apply { if (current == null) addText("Selected") }
+					// The tick goes in the picture: this host ignores Row.setEndImage.
+					.setImage(swatchIcon(Rgb(255, 255, 255), checked = current == null), Row.IMAGE_TYPE_SMALL)
 					.setOnClickListener {
 						CardiController.clearPattern()
 						confirm(carContext, "Solid colour on $zoneLabel")
-						screenManager.pop()
+						invalidate()
 					}
 					.build()
 			)
@@ -59,11 +61,11 @@ class PatternScreen(
 			list.addItem(
 				Row.Builder()
 					.setTitle(pattern.label)
-					.apply { if (current == pattern.index) addText("Selected") }
+					.setImage(patternIcon(pattern.index, checked = current == pattern.index), Row.IMAGE_TYPE_SMALL)
 					.setOnClickListener {
 						CardiController.setPattern(pattern.index)
 						confirm(carContext, "${pattern.label} on $zoneLabel")
-						screenManager.pop()
+						invalidate()
 					}
 					.build()
 			)

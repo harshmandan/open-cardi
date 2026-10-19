@@ -23,8 +23,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The kits in range, scanned while this screen is open, to pick from by name
- * and MAC like the phone app's picker. Picking one connects to it and goes
- * back.
+ * and MAC like the phone app's picker. Picking one connects to it.
  */
 class KitListScreen(carContext: CarContext) : Screen(carContext) {
 
@@ -87,7 +86,7 @@ class KitListScreen(carContext: CarContext) : Screen(carContext) {
 							CardiController.disconnect()
 							CardiController.choose(kit.address)
 							CardiController.connect()
-							screenManager.popToRoot()
+							invalidate()
 						}
 					}
 					.build()

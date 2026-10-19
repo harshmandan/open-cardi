@@ -61,79 +61,21 @@ fun stepIcon(plus: Boolean): CarIcon {
 	return CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).build()
 }
 
-
-/**
- * A still "loading" icon: a three-quarter ring around [glyph]. Not animated —
- * the car app quality rules forbid animated elements (SA-1), and templates
- * have no spinner for actions.
- */
-fun loadingIcon(glyph: Drawable, px: Int): IconCompat {
-	val bitmap = Bitmap.createBitmap(px, px, Bitmap.Config.ARGB_8888)
-	val canvas = Canvas(bitmap)
-	val stroke = px * 0.09f
-	val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-		color = android.graphics.Color.WHITE
-		style = Paint.Style.STROKE
-		strokeWidth = stroke
-		strokeCap = Paint.Cap.ROUND
-	}
-	val inset = stroke / 2 + px * 0.04f
-	canvas.drawArc(inset, inset, px - inset, px - inset, -90f, 270f, false, ring)
-	// Same glyph size as the plain Bluetooth icons, so only the ring changes.
-	val g = (px * BT_INSET).toInt()
-	glyph.mutate().apply {
-		setTint(android.graphics.Color.WHITE)
-		setBounds(g, g, px - g, px - g)
-		draw(canvas)
-	}
-	return IconCompat.createWithBitmap(bitmap)
-}
-
-private const val ICON_PX = 96
-
-// The Bluetooth glyph fills its box edge to edge and looked too big on the
-// floating button next to the power icon.
-private const val BT_INSET = 0.1f
-
-// Rasterised rather than passed by resource id: the host caches the app's
-// resources, and after an update that shifted resource ids it drew the wrong
-// icons (a sun for "−", the pattern icon for "+").
-// [inset] shrinks the glyph inside the icon, for when the host draws it larger
-// than looks right.
-fun carIcon(
-	carContext: Context,
-	res: Int,
-	tint: CarColor = CarColor.DEFAULT,
-	inset: Float = 0f,
-): CarIcon {
-	val bitmap = Bitmap.createBitmap(ICON_PX, ICON_PX, Bitmap.Config.ARGB_8888)
-	val pad = (ICON_PX * inset).toInt()
-	ContextCompat.getDrawable(carContext, res)!!.mutate().apply {
-		setBounds(pad, pad, ICON_PX - pad, ICON_PX - pad)
-		draw(Canvas(bitmap))
-	}
-	return CarIcon.Builder(IconCompat.createWithBitmap(bitmap)).setTint(tint).build()
-}
-
 // Every link state gets its own look, and none of them move: the car app
 // quality rules forbid animated elements (SA-1), so no flashing or spinning.
-// Scanning for kits counts as searching too.
-fun bluetoothIcon(carContext: Context, state: CardiState): CarIcon {
-	val connection = state.connection
-	return when {
-		connection == Connection.CONNECTED ->
-			carIcon(carContext, R.drawable.ic_car_bt_connected, inset = BT_INSET)
-		connection != Connection.DISCONNECTED || state.discovering -> {
-			val glyph = ContextCompat.getDrawable(
-				carContext, R.drawable.ic_car_bt_connected
-			)!!
-			CarIcon.Builder(loadingIcon(glyph, ICON_PX))
-				.setTint(CarColor.DEFAULT)
-				.build()
-		}
-		else -> carIcon(carContext, R.drawable.ic_car_bt_disabled, CarColor.RED, inset = BT_INSET)
-	}
+// Scanning for kits counts as searching too. Resources rather than bitmaps:
+// the library never treats two bitmaps as equal (CarIcon.equals), so the
+// host can't tell a bitmap button is unchanged between refreshes.
+fun bluetoothIcon(carContext: Context, state: CardiState): CarIcon = when {
+	state.connection == Connection.CONNECTED -> resIcon(carContext, R.drawable.ic_car_fab_bt_connected)
+	state.connection != Connection.DISCONNECTED || state.discovering ->
+		resIcon(carContext, R.drawable.ic_car_fab_bt_searching)
+	else -> resIcon(carContext, R.drawable.ic_car_fab_bt_disabled, CarColor.RED)
 }
+
+/** An icon by resource id; see [bluetoothIcon] for why. */
+fun resIcon(carContext: Context, res: Int, tint: CarColor = CarColor.DEFAULT): CarIcon =
+	CarIcon.Builder(IconCompat.createWithResource(carContext, res)).setTint(tint).build()
 
 // [scale] shrinks the tick about the centre, for discs with a ring drawn
 // round the edge, where a full-size tick crowds the ring.
@@ -167,7 +109,8 @@ fun levelIcon(level: Int, checked: Boolean): CarIcon {
 	canvas.drawArc(
 		inset, inset, SWATCH_PX - inset, SWATCH_PX - inset, -90f, level * 3.6f, false,
 		Paint(Paint.ANTI_ALIAS_FLAG).apply {
-			color = android.graphics.Color.WHITE
+			// Dimmed so the tick on the current level stands out.
+			color = android.graphics.Color.argb(110, 255, 255, 255)
 			style = Paint.Style.STROKE
 			strokeWidth = stroke
 			strokeCap = Paint.Cap.ROUND

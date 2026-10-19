@@ -10,7 +10,7 @@ import androidx.car.app.model.ItemList
 import androidx.car.app.model.Template
 import ink.harsh.opencardi.ble.CardiController
 
-/** Every tenth brightness level, to jump straight to one; picking it goes back. */
+/** Every tenth brightness level, to jump straight to one. */
 class BrightnessScreen(
 	carContext: CarContext,
 	// Named in the header so it's clear which zone it applies to.
@@ -31,7 +31,7 @@ class BrightnessScreen(
 					.setOnClickListener {
 						CardiController.setBrightness(level)
 						confirm(carContext, "Brightness $level%")
-						screenManager.pop()
+						invalidate()
 					}
 					.build()
 			)
