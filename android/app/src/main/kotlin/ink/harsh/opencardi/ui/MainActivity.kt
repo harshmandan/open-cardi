@@ -45,6 +45,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.material3.FilledTonalIconToggleButton
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothConnected
@@ -56,6 +61,7 @@ import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -72,7 +78,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -102,6 +107,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import ink.harsh.opencardi.ble.LabFlags
+import ink.harsh.opencardi.ble.linkLabel
 import ink.harsh.opencardi.ble.CardiController
 import ink.harsh.opencardi.ble.CardiService
 import ink.harsh.opencardi.ble.CardiState
@@ -246,22 +252,25 @@ private fun Screen(
 		label = "saturation",
 	)
 
+	// Applied to everything but the power button, which keeps its colour so
+	// it never looks disabled.
+	val drained = Modifier.graphicsLayer {
+		renderEffect = if (saturation < 0.999f) {
+			AndroidRenderEffect.createColorFilterEffect(
+				ColorMatrixColorFilter(
+					ColorMatrix().apply { setSaturation(saturation) }
+				)
+			).asComposeRenderEffect()
+		} else {
+			null
+		}
+	}
+
 	Scaffold(containerColor = MaterialTheme.colorScheme.background) { inner ->
 		Column(
 			modifier = Modifier
 				.fillMaxSize()
-				.padding(inner)
-				.graphicsLayer {
-					renderEffect = if (saturation < 0.999f) {
-						AndroidRenderEffect.createColorFilterEffect(
-							ColorMatrixColorFilter(
-								ColorMatrix().apply { setSaturation(saturation) }
-							)
-						).asComposeRenderEffect()
-					} else {
-						null
-					}
-				},
+				.padding(inner),
 			horizontalAlignment = Alignment.CenterHorizontally,
 		) {
 			ZoneArea(
@@ -283,10 +292,10 @@ private fun Screen(
 					}
 				},
 				onCustomColor = { sheet = Sheet.CUSTOM_COLOR },
-				modifier = Modifier.weight(1f),
+				modifier = Modifier.weight(1f).then(drained),
 			)
 
-			BrightnessRow(state.brightness, accent)
+			Box(drained) { BrightnessRow(state.brightness, accent) }
 
 			Spacer(Modifier.height(20.dp))
 
@@ -294,16 +303,19 @@ private fun Screen(
 				state = state,
 				onPatterns = { sheet = Sheet.PATTERN },
 				onVoice = { sheet = Sheet.VOICE },
+				drained = drained,
 			)
 
 			Spacer(Modifier.height(16.dp))
 
-			BottomBar(
-				state = state,
-				onToggle = onConnectToggle,
-				onAbout = { sheet = Sheet.ABOUT },
-				onSettings = { sheet = Sheet.SETTINGS },
-			)
+			Box(drained) {
+				BottomBar(
+					state = state,
+					onToggle = onConnectToggle,
+					onAbout = { sheet = Sheet.ABOUT },
+					onSettings = { sheet = Sheet.SETTINGS },
+				)
+			}
 
 			Spacer(Modifier.height(12.dp))
 		}
@@ -623,7 +635,12 @@ private fun BrightnessRow(pct: Int, accent: Color) {
 }
 
 @Composable
-private fun ControlRow(state: CardiState, onPatterns: () -> Unit, onVoice: () -> Unit) {
+private fun ControlRow(
+	state: CardiState,
+	onPatterns: () -> Unit,
+	onVoice: () -> Unit,
+	drained: Modifier,
+) {
 	val pattern = state.patternIndex?.let { Patterns.list.getOrNull(it) }
 
 	Row(
@@ -633,17 +650,24 @@ private fun ControlRow(state: CardiState, onPatterns: () -> Unit, onVoice: () ->
 	) {
 		// The icon becomes the active pattern's own glyph, and the tile fills
 		// with the accent — so the button says what is running.
-		SquareAction(
-			icon = pattern?.let { patternIcon(it) } ?: Icons.Filled.Tune,
-			description = "Patterns",
-			selected = pattern != null,
-			onClick = onPatterns,
-		)
+		Box(drained) {
+			SquareAction(
+				icon = pattern?.let { patternIcon(it) } ?: Icons.Filled.Tune,
+				description = "Patterns",
+				selected = pattern != null,
+				onClick = onPatterns,
+			)
+		}
 
 		ToggleButton(
 			checked = state.masterOn,
 			onCheckedChange = { CardiController.setMaster(it) },
 			shapes = ToggleButtonShapes(CircleShape, CircleShape, CircleShape),
+			// Off is red, not the unchecked grey, which read as disabled.
+			colors = ToggleButtonDefaults.toggleButtonColors(
+				containerColor = MaterialTheme.colorScheme.errorContainer,
+				contentColor = MaterialTheme.colorScheme.onErrorContainer,
+			),
 			contentPadding = PaddingValues(0.dp),
 			modifier = Modifier.size(112.dp),
 		) {
@@ -654,12 +678,14 @@ private fun ControlRow(state: CardiState, onPatterns: () -> Unit, onVoice: () ->
 			)
 		}
 
-		SquareAction(
-			icon = if (state.micMode != null) Icons.Filled.GraphicEq else Icons.Filled.Mic,
-			description = "Voice",
-			selected = state.micMode != null,
-			onClick = onVoice,
-		)
+		Box(drained) {
+			SquareAction(
+				icon = if (state.micMode != null) Icons.Filled.GraphicEq else Icons.Filled.Mic,
+				description = "Voice",
+				selected = state.micMode != null,
+				onClick = onVoice,
+			)
+		}
 	}
 }
 
@@ -740,13 +766,7 @@ private fun BottomBar(
 			)
 			Spacer(Modifier.width(8.dp))
 			Text(
-				when (state.connection) {
-					Connection.CONNECTED -> state.deviceName ?: "Connected"
-					Connection.CONNECTING -> "Connecting…"
-					Connection.RECONNECTING -> "Reconnecting…"
-					Connection.SCANNING -> "Scanning…"
-					Connection.DISCONNECTED -> "Connect"
-				},
+				if (state.connection == Connection.DISCONNECTED) "Connect" else state.linkLabel(),
 				style = MaterialTheme.typography.labelLarge,
 				maxLines = 1,
 			)
@@ -1201,105 +1221,109 @@ private fun SettingsSheet(state: CardiState) {
 		}
 	}
 
-	GroupLabel("Lock code")
-	Text(
-		"Lock stops your lights following other Cardi cars nearby. Unlock undoes " +
-			"it. The lights end on red or green — pick your colour again after.",
-		style = MaterialTheme.typography.bodySmall,
-		color = MaterialTheme.colorScheme.onSurfaceVariant,
-	)
-	KnockButton(state, "lock", "Lock")
-	KnockButton(state, "decode", "Unlock")
+	LockCodeRow(state)
 
-	GroupLabel("Factory reset")
-	Text(
-		"Restores the kit's factory settings, as in the vendor app. The kit " +
-			"restarts and the app reconnects.",
-		style = MaterialTheme.typography.bodySmall,
-		color = MaterialTheme.colorScheme.onSurfaceVariant,
-	)
-	ConfirmButton(
-		label = "Restore defaults",
-		enabled = state.isConnected && state.knock == null,
-		onConfirm = CardiController::factoryReset,
-	)
+	FactoryResetRow(state)
 }
 
-/** Two-tap confirm for a one-shot action: first tap arms, second sends. */
+/**
+ * Factory reset laid out like [LockCodeRow]: heading and one line on the
+ * left, an icon button on the right. First tap arms, a second within three
+ * seconds sends.
+ */
 @Composable
-private fun ConfirmButton(label: String, enabled: Boolean, onConfirm: () -> Unit) {
-	var armedAt by remember { mutableLongStateOf(0L) }
-	val armed = armedAt != 0L
-	LaunchedEffect(armedAt) {
-		if (armedAt != 0L) {
+private fun FactoryResetRow(state: CardiState) {
+	var armed by remember { mutableStateOf(false) }
+	LaunchedEffect(armed) {
+		if (armed) {
 			kotlinx.coroutines.delay(3_000)
-			armedAt = 0L
+			armed = false
 		}
 	}
-	ToggleButton(
-		checked = armed,
-		enabled = enabled,
-		onCheckedChange = {
-			if (armed) {
-				armedAt = 0L
-				onConfirm()
-			} else {
-				armedAt = System.currentTimeMillis()
-			}
-		},
-		shapes = pillShapes(),
-		colors = tileColors(),
-		modifier = Modifier
-			.fillMaxWidth()
-			.height(52.dp),
-	) {
-		Text(
-			if (armed) "Tap again to confirm" else if (!enabled) "$label (connect first)" else label,
-			style = MaterialTheme.typography.labelLarge,
-		)
+	Row(verticalAlignment = Alignment.CenterVertically) {
+		Column(Modifier.weight(1f)) {
+			GroupLabel("Factory reset")
+			Text(
+				when {
+					armed -> "Tap again to reset the kit"
+					!state.isConnected -> "Connect first"
+					else -> "Restore factory settings; the kit restarts"
+				},
+				style = MaterialTheme.typography.bodySmall,
+				color = MaterialTheme.colorScheme.onSurfaceVariant,
+				maxLines = 1,
+				overflow = TextOverflow.Ellipsis,
+			)
+		}
+		FilledTonalIconToggleButton(
+			checked = armed,
+			enabled = state.isConnected && state.knock == null,
+			onCheckedChange = {
+				if (armed) {
+					armed = false
+					CardiController.factoryReset()
+				} else {
+					armed = true
+				}
+			},
+		) {
+			Icon(Icons.Filled.RestartAlt, contentDescription = "Factory reset")
+		}
 	}
 }
 
 /**
- * First tap arms, a second tap within three seconds sends. Both change a
- * setting the kit keeps, so a stray tap shouldn't fire one.
+ * Lock and Unlock as two icon buttons beside the heading. First tap arms, a
+ * second within three seconds sends: both change a setting the kit keeps, so
+ * a stray tap shouldn't fire one. The one-line description says what a tap
+ * will do next.
  */
 @Composable
-private fun KnockButton(state: CardiState, which: String, label: String) {
-	var armedAt by remember { mutableLongStateOf(0L) }
-	val armed = armedAt != 0L
-	LaunchedEffect(armedAt) {
-		if (armedAt != 0L) {
+private fun LockCodeRow(state: CardiState) {
+	var armed by remember { mutableStateOf<String?>(null) }
+	LaunchedEffect(armed) {
+		if (armed != null) {
 			kotlinx.coroutines.delay(3_000)
-			armedAt = 0L
+			armed = null
 		}
 	}
 	val enabled = state.isConnected && state.knock == null
-	ToggleButton(
-		checked = armed,
-		enabled = enabled,
-		onCheckedChange = {
-			if (armed) {
-				armedAt = 0L
-				if (which == "lock") CardiController.sendLockCode() else CardiController.sendDecode()
-			} else {
-				armedAt = System.currentTimeMillis()
+	Row(verticalAlignment = Alignment.CenterVertically) {
+		Column(Modifier.weight(1f)) {
+			GroupLabel("Lock code")
+			Text(
+				when {
+					state.knock == "lock" -> "Sending Lock…"
+					state.knock == "decode" -> "Sending Unlock…"
+					armed == "lock" -> "Tap Lock again to send"
+					armed == "decode" -> "Tap Unlock again to send"
+					!state.isConnected -> "Connect first"
+					else -> "Stop following nearby Cardi cars"
+				},
+				style = MaterialTheme.typography.bodySmall,
+				color = MaterialTheme.colorScheme.onSurfaceVariant,
+				maxLines = 1,
+				overflow = TextOverflow.Ellipsis,
+			)
+		}
+		for ((which, icon, label) in listOf(
+			Triple("lock", Icons.Filled.Lock, "Lock"),
+			Triple("decode", Icons.Filled.LockOpen, "Unlock"),
+		)) {
+			FilledTonalIconToggleButton(
+				checked = armed == which,
+				enabled = enabled,
+				onCheckedChange = {
+					if (armed == which) {
+						armed = null
+						if (which == "lock") CardiController.sendLockCode() else CardiController.sendDecode()
+					} else {
+						armed = which
+					}
+				},
+			) {
+				Icon(icon, contentDescription = label)
 			}
-		},
-		shapes = pillShapes(),
-		colors = tileColors(),
-		modifier = Modifier
-			.fillMaxWidth()
-			.height(52.dp),
-	) {
-		Text(
-			when {
-				state.knock == which -> "Sending…"
-				armed -> "Tap again to confirm"
-				!state.isConnected -> "$label (connect first)"
-				else -> label
-			},
-			style = MaterialTheme.typography.labelLarge,
-		)
+		}
 	}
 }

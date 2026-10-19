@@ -5,12 +5,18 @@ import androidx.car.app.CarContext
 import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.Header
-import androidx.car.app.model.ItemList
-import androidx.car.app.model.ListTemplate
-import androidx.car.app.model.MessageTemplate
+import ink.harsh.opencardi.ble.CardiState
+import androidx.car.app.CarToast
+import ink.harsh.opencardi.R
 import androidx.car.app.model.Row
+import androidx.car.app.model.GridItem
+import androidx.car.app.model.GridSection
+import androidx.car.app.model.RowSection
+import androidx.car.app.model.SectionedItemTemplate
+import androidx.car.app.model.CarColor
+import androidx.car.app.model.CarIcon
+import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
-import androidx.car.app.model.Toggle
 import androidx.core.content.ContextCompat
 import ink.harsh.opencardi.ble.CardiController
 import ink.harsh.opencardi.ble.Connection
@@ -21,24 +27,78 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.drop
+import ink.harsh.opencardi.ble.linkLabel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The car's home screen. Five rows — under the host's six-row cap, with no
- * paging needed at this level.
+ * The car's home screen: Zone, Colour, Brightness and Pattern rows, each
+ * showing its current value and opening a page to change it. Power and
+ * Bluetooth are floating buttons.
  */
 class RootScreen(carContext: CarContext) : Screen(carContext) {
 
 	private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
 	init {
-		// Re-render whenever the kit's state moves, including changes the user
-		// made on the phone or that the device reported back over notify.
 		scope.launch {
-			CardiController.state.drop(1).collect { invalidate() }
+			// Only for what this screen shows; a scan would otherwise refresh it
+			// for every kit it saw.
+			CardiController.state
+				.map { it.copy(foundKits = emptyList(), favorites = emptyList(), customColors = emptyList(), speed = 0) }
+				.distinctUntilChanged()
+				.drop(1)
+				// Let a step tap's ripple finish before the redraw replaces it.
+				.collectLatest {
+					delay(RIPPLE_MS)
+					invalidate()
+				}
+		}
+		// The page has no title bar, so say link changes out loud.
+		scope.launch {
+			CardiController.state
+				.map { it.connection to it.deviceName }
+				.distinctUntilChanged()
+				.drop(1)
+				.collect {
+					CarToast.makeText(
+						carContext, CardiController.state.value.linkLabel(), CarToast.LENGTH_SHORT
+					).show()
+				}
+		}
+		// Say what an auto-scan found, since the kit list is a screen away.
+		scope.launch {
+			CardiController.state
+				.map { it.discovering }
+				.distinctUntilChanged()
+				.drop(1)
+				.collect { discovering ->
+					val found = CardiController.state.value.foundKits.size
+					if (!discovering && CardiController.rememberedAddress == null &&
+						screenManager.top === this@RootScreen
+					) {
+						val text = when (found) {
+							0 -> "No kits found"
+							1 -> "Found 1 kit. Tap Bluetooth to choose it."
+							else -> "Found $found kits. Tap Bluetooth to choose."
+						}
+						CarToast.makeText(carContext, text, CarToast.LENGTH_LONG).show()
+					}
+				}
 		}
 		lifecycle.addObserver(
 			object : androidx.lifecycle.DefaultLifecycleObserver {
+				// Access may have been granted from the phone app while this
+				// screen was away; don't leave the driver on the permission
+				// message.
+				override fun onStart(owner: androidx.lifecycle.LifecycleOwner) {
+					invalidate()
+					scanIfNoKit()
+				}
+
 				override fun onDestroy(owner: androidx.lifecycle.LifecycleOwner) {
 					scope.cancel()
 				}
@@ -46,84 +106,129 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 		)
 	}
 
+	// With no kit chosen nothing would ever connect, so look for kits as soon
+	// as the screen shows; the Bluetooth button shows the searching icon
+	// meanwhile. Never connects on its own: the kit in range may be another
+	// car's.
+	private fun scanIfNoKit() {
+		val state = CardiController.state.value
+		if (CardiController.rememberedAddress != null || state.discovering ||
+			state.connection != Connection.DISCONNECTED
+		) return
+		val canScan = ContextCompat.checkSelfPermission(
+			carContext, Manifest.permission.BLUETOOTH_SCAN
+		) == android.content.pm.PackageManager.PERMISSION_GRANTED
+		if (canScan) withBluetooth(carContext) { CardiController.startDiscovery() }
+	}
+
 	private fun hasBluetoothPermission(): Boolean =
 		ContextCompat.checkSelfPermission(
 			carContext, Manifest.permission.BLUETOOTH_CONNECT
 		) == android.content.pm.PackageManager.PERMISSION_GRANTED
 
-	override fun onGetTemplate(): Template {
+	override fun onGetTemplate(): Template = guarded(carContext) { template() }
+
+	private fun template(): Template {
 		if (!hasBluetoothPermission()) return permissionTemplate()
+		return home(CardiController.state.value)
+	}
 
-		val state = CardiController.state.value
-		if (!state.isConnected) return connectingTemplate(state.connection)
+	/**
+	 * Home: one row per setting, showing its current value; each opens a
+	 * page to change it. Brightness also has its −5 −1 +1 +5 steps here.
+	 *
+	 * Android Auto 17.8 rebuilds a sectioned page from blank whenever its
+	 * content changes (tested in the DHU), so a step tap redraws this page;
+	 * accepted for brightness. Colour, zone and pattern change on their own
+	 * pages, plain grids that update in place.
+	 */
+	private fun home(state: CardiState): Template {
+		val zone = Zones.byId(state.zoneId)?.label ?: state.zoneId
+		val colour = state.color.takeIf { state.patternIndex == null && state.micMode == null }
+			?.let { colourName(it) ?: "Custom" }
+			?: "—"
+		val pattern = state.patternIndex
+			?.let { i -> Patterns.list.firstOrNull { it.index == i }?.label }
+			?: "Solid colour"
 
-		val zoneLabel = Zones.byId(state.zoneId)?.label ?: state.zoneId
-		val patternLabel = state.patternIndex
-			?.let { Patterns.list.getOrNull(it)?.label }
-			?: "Off"
-
-		val list = ItemList.Builder()
-			.addItem(masterRow(state.masterOn))
-			.addItem(brightnessRow(state.brightness))
-			.addItem(browseRow("Color", null) { screenManager.push(ColorScreen(carContext)) })
-			.addItem(browseRow("Pattern", patternLabel) {
-				screenManager.push(PatternScreen(carContext))
-			})
-			.addItem(browseRow("Zone", zoneLabel) { screenManager.push(ZoneScreen(carContext)) })
-			.build()
-
-		return ListTemplate.Builder()
-			.setHeader(
-				Header.Builder()
-					.setTitle(state.deviceName ?: "open-cardi")
-					.setStartHeaderAction(Action.APP_ICON)
+		return SectionedItemTemplate.Builder()
+			.setHeader(Header.Builder().setTitle("open-cardi").setStartHeaderAction(Action.APP_ICON).build())
+			.addSection(
+				RowSection.Builder()
+					.addItem(row("Zone", zone, R.drawable.ic_car_zone) { ZoneScreen(carContext) })
+					.addItem(row("Colour", colour, R.drawable.ic_car_colour) { ColorScreen(carContext, zone) })
+					.addItem(row("Brightness", "${state.brightness}%", R.drawable.ic_car_brightness) {
+						BrightnessScreen(carContext, zone)
+					})
 					.build()
 			)
-			.setSingleList(list)
+			.addSection(
+				GridSection.Builder()
+					.setItemSize(GridSection.ITEM_SIZE_SMALL)
+					.setItems(stepTiles(state.brightness))
+					.build()
+			)
+			.addSection(
+				RowSection.Builder()
+					.addItem(row("Pattern", pattern, R.drawable.ic_car_pattern) { PatternScreen(carContext, zone) })
+					.build()
+			)
+			.addAction(powerFab(state))
+			.addAction(bluetoothFab(state))
 			.build()
 	}
 
-	private fun masterRow(on: Boolean) = Row.Builder()
-		.setTitle("Lights")
-		.setToggle(
-			Toggle.Builder { checked -> CardiController.setMaster(checked) }
-				.setChecked(on)
-				.build()
-		)
-		.build()
+	// Steps rather than presets: four fit one row and reach any exact value;
+	// the 10–100% presets are on the Brightness page.
+	private fun stepTiles(b: Int) = listOf(-5, -1, 1, 5).map { step ->
+		GridItem.Builder()
+			// A title is required in practice: Android Auto 17.8 crashed on an
+			// untitled grid item ("A title must be set on the row").
+			.setTitle(if (step > 0) "+$step" else "−${-step}")
+			// LARGE, not ICON: the host tints icon-type images.
+			.setImage(stepIcon(plus = step > 0), GridItem.IMAGE_TYPE_LARGE)
+			.setOnClickListener { CardiController.setBrightness((b + step).coerceIn(1, 100)) }
+			.build()
+	}
 
-	/**
-	 * No car template has a slider, so brightness is a value with −/+ actions
-	 * beside it. That keeps it to a single glance and two taps rather than a
-	 * drill-in and a list.
-	 */
-	private fun brightnessRow(pct: Int) = Row.Builder()
-		.setTitle("Brightness")
-		.addText("$pct%")
-		.addAction(
-			Action.Builder()
-				.setTitle("−")
-				.setOnClickListener { CardiController.setBrightness(pct - BRIGHTNESS_STEP) }
-				.build()
-		)
-		.addAction(
-			Action.Builder()
-				.setTitle("+")
-				.setOnClickListener { CardiController.setBrightness(pct + BRIGHTNESS_STEP) }
-				.build()
-		)
-		.build()
-
-	private fun browseRow(title: String, value: String?, onClick: () -> Unit) =
+	private fun row(title: String, value: String, iconRes: Int, page: () -> Screen) =
 		Row.Builder()
 			.setTitle(title)
-			.apply { value?.let { addText(it) } }
+			.addText(value)
+			.setImage(resIcon(carContext, iconRes))
 			.setBrowsable(true)
-			.setOnClickListener { onClick() }
+			.setOnClickListener { screenManager.push(page()) }
 			.build()
 
+	// Floating buttons. Tested in the DHU (host car API 8): drawn on list and
+	// sectioned templates, including inside tabs, but never on a GridTemplate,
+	// which is why home is a list and the grid pages have none. The
+	// host restyles them, so the background colour is only what the API
+	// requires, not what shows.
+	private fun powerFab(state: CardiState) =
+		Action.Builder()
+			.setIcon(resIcon(carContext, R.drawable.ic_car_power))
+			.setBackgroundColor(if (state.masterOn) CarColor.GREEN else CarColor.RED)
+			.setOnClickListener {
+				CardiController.setMaster(!state.masterOn)
+				confirm(carContext, if (state.masterOn) "Lights turned off" else "Lights turned on")
+			}
+			.build()
+
+	private fun bluetoothFab(state: CardiState) =
+		Action.Builder()
+			.setIcon(bluetoothIcon(carContext, state))
+			.setBackgroundColor(CarColor.BLUE)
+			.setOnClickListener { screenManager.push(DeviceScreen(carContext)) }
+			.build()
+
+	// Google's "grant permissions on phone" flow: a message template with a
+	// primary and a secondary button, a toast pointing at the phone, then
+	// back to the landing screen once granted (the callback invalidates, and
+	// onGetTemplate sees the permission).
 	private fun permissionTemplate(): Template =
-		MessageTemplate.Builder("Grant Bluetooth access to reach your lights.")
+		MessageTemplate.Builder("open-cardi needs Bluetooth permission to reach your lights")
+			.setIcon(CarIcon.ALERT)
 			.setHeader(
 				Header.Builder()
 					.setTitle("open-cardi")
@@ -132,46 +237,16 @@ class RootScreen(carContext: CarContext) : Screen(carContext) {
 			)
 			.addAction(
 				Action.Builder()
-					.setTitle("Grant")
-					.setOnClickListener {
-						// On Android Auto this dialog appears on the phone — the
-						// platform gives us no way to grant it on the car screen.
-						carContext.requestPermissions(
-							listOf(
-								Manifest.permission.BLUETOOTH_CONNECT,
-								Manifest.permission.BLUETOOTH_SCAN,
-							)
-						) { _, _ -> invalidate() }
-					}
+					.setTitle("Grant permissions")
+					.setFlags(Action.FLAG_PRIMARY)
+					.setOnClickListener { askOnPhone(carContext) { invalidate() } }
 					.build()
 			)
-			.build()
-
-	private fun connectingTemplate(connection: Connection): Template =
-		MessageTemplate.Builder(
-			when (connection) {
-				Connection.SCANNING -> "Looking for your lights…"
-				Connection.CONNECTING -> "Connecting…"
-				Connection.RECONNECTING -> "Reconnecting…"
-				else -> "Not connected."
-			}
-		)
-			.setHeader(
-				Header.Builder()
-					.setTitle("open-cardi")
-					.setStartHeaderAction(Action.APP_ICON)
+			.addAction(
+				Action.Builder()
+					.setTitle("Cancel")
+					.setOnClickListener { carContext.finishCarApp() }
 					.build()
 			)
-			.setLoading(connection != Connection.DISCONNECTED)
-			.apply {
-				if (connection == Connection.DISCONNECTED) {
-					addAction(
-						Action.Builder()
-							.setTitle("Retry")
-							.setOnClickListener { CardiController.connect() }
-							.build()
-					)
-				}
-			}
 			.build()
 }

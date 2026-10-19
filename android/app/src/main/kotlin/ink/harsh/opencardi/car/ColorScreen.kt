@@ -1,43 +1,30 @@
 package ink.harsh.opencardi.car
 
 import androidx.car.app.CarContext
-import androidx.car.app.Screen
-import androidx.car.app.model.Action
 import androidx.car.app.model.GridItem
-import androidx.car.app.model.GridTemplate
-import androidx.car.app.model.Header
-import androidx.car.app.model.ItemList
-import androidx.car.app.model.Template
 import ink.harsh.opencardi.ble.CardiController
+import ink.harsh.opencardi.ble.CardiState
 
-/** Six swatches, drawn as images because the car has no colour picker. */
-class ColorScreen(carContext: CarContext) : Screen(carContext) {
+/** Every colour in [MORE_COLOURS]; the lit one says so. */
+class ColorScreen(
+	carContext: CarContext,
+	// Named in the header so it's clear which zone the colour goes to.
+	private val zoneLabel: String,
+) : EditGridScreen(carContext) {
 
-	override fun onGetTemplate(): Template {
-		val items = ItemList.Builder()
-		for ((name, rgb) in CAR_PALETTE.take(gridLimit())) {
-			items.addItem(
-				GridItem.Builder()
-					.setTitle(name)
-					.setImage(swatchIcon(rgb))
-					.setOnClickListener {
-						CardiController.setColor(rgb)
-						screenManager.pop()
-					}
-					.build()
-			)
+	override val title get() = "Colour · $zoneLabel"
+
+	override fun watched(state: CardiState) = current(state) ?: Unit
+
+	private fun current(state: CardiState) =
+		state.color.takeIf { state.patternIndex == null && state.micMode == null }
+
+	override fun tiles(state: CardiState): List<GridItem> {
+		val current = current(state)
+		return MORE_COLOURS.map { (name, rgb) ->
+			tile(name, swatchIcon(rgb), SELECTED.takeIf { rgb == current }) {
+				CardiController.setColor(rgb)
+			}
 		}
-
-		return GridTemplate.Builder()
-			.setHeader(
-				Header.Builder()
-					.setTitle("Color")
-					.setStartHeaderAction(Action.BACK)
-					.build()
-			)
-			.setSingleList(items.build())
-			.build()
 	}
-
-	private fun gridLimit(): Int = carLimit(carContext, GRID)
 }
