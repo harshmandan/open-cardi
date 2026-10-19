@@ -28,6 +28,18 @@ data class CardiState(
 	val isConnected: Boolean get() = connection == Connection.CONNECTED
 }
 
+/** "Connected to CarDiLits", "Reconnecting to CarDiLits…", and so on. */
+fun CardiState.linkLabel(): String {
+	val name = deviceName ?: "your lights"
+	return when (connection) {
+		Connection.CONNECTED -> "Connected to $name"
+		Connection.CONNECTING -> "Connecting to $name…"
+		Connection.RECONNECTING -> "Reconnecting to $name…"
+		Connection.SCANNING -> "Looking for your lights…"
+		Connection.DISCONNECTED -> if (deviceName != null) "Disconnected from $name" else "Not connected"
+	}
+}
+
 enum class Connection { DISCONNECTED, SCANNING, CONNECTING, RECONNECTING, CONNECTED }
 
 /** A kit seen while scanning, for the device picker. */

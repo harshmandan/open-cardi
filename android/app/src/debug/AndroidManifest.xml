@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Debug builds only: declare the template car app so the Desktop Head Unit
+     (DHU) can run it. Android Auto's validator rejects a sideloaded template
+     app on a real head unit, so release builds keep the projected, parked-only
+     Activity instead (see src/main/AndroidManifest.xml). With both declared
+     the host prefers this service, which is what DHU testing wants. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+	<application>
+		<service
+			android:name=".car.CardiCarAppService"
+			android:exported="true">
+			<intent-filter>
+				<action android:name="androidx.car.app.CarAppService" />
+				<category android:name="androidx.car.app.category.IOT" />
+			</intent-filter>
+		</service>
+	</application>
+</manifest>

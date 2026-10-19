@@ -80,6 +80,10 @@ private const val MASTER_MAX_IN_WINDOW = 4
  * Android an overflowing GATT queue surfaces as "GATT operation in progress"
  * and drops the link, so the coalescer is not optional here.
  */
+/** True for names our kits advertise (CarDiLits, iLits, BaoYin, …). */
+fun isKitName(name: String?): Boolean =
+	name != null && DEVICE_NAME_PREFIXES.any { name.startsWith(it) }
+
 @SuppressLint("MissingPermission") // callers hold BLUETOOTH_SCAN / BLUETOOTH_CONNECT
 class CardiClient(
 	private val context: Context,
@@ -131,10 +135,10 @@ class CardiClient(
 		val cb = object : ScanCallback() {
 			override fun onScanResult(callbackType: Int, result: ScanResult) {
 				val name = result.device.name ?: result.scanRecord?.deviceName
-				val serviceMatch =
-					result.scanRecord?.serviceUuids?.any { it.uuid == SERVICE_UUID } == true
-				val nameMatch = name != null && DEVICE_NAME_PREFIXES.any { name.startsWith(it) }
-				if (!serviceMatch && !nameMatch) return
+				// By name only. FFF0 is a generic vendor service that plenty of
+				// unrelated BLE gadgets advertise — matching on it once had the
+				// app remember a stranger's device ("FS-094125") as the kit.
+				if (!isKitName(name)) return
 				onFound(FoundKit(result.device.address, name, result.rssi))
 			}
 
@@ -146,8 +150,8 @@ class CardiClient(
 		}
 		scanCallback = cb
 
-		// No ScanFilter: a kit that doesn't advertise FFF0 is still matched by
-		// name above, and a service filter would hide it.
+		// No ScanFilter: names can't be prefix-matched by one, so the name
+		// check above does the filtering.
 		val settings = ScanSettings.Builder()
 			.setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
 			.build()
@@ -163,6 +167,10 @@ class CardiClient(
 	}
 
 	fun stopDiscovery() = stopScan()
+
+	/** The cached name of a device we've seen, without connecting to it. */
+	fun cachedName(address: String): String? =
+		runCatching { adapter?.getRemoteDevice(address)?.name }.getOrNull()
 
 	private fun stopScan() {
 		scanCallback?.let { adapter?.bluetoothLeScanner?.stopScan(it) }

@@ -37,6 +37,12 @@ class CardiCarAppService : CarAppService() {
 class CardiSession : Session() {
 
 	override fun onCreateScreen(intent: Intent): Screen {
+		// What this host supports decides which templates and buttons render.
+		android.util.Log.i(
+			"CardiCar",
+			"host carAppApiLevel=${carContext.carAppApiLevel} " +
+				"gridLimit=${carLimit(carContext, GRID)} listLimit=${carLimit(carContext, LIST)}",
+		)
 		// The kit takes one connection at a time, so we only hold the radio
 		// while the car is attached. Off-car the link is free for the PWA.
 		CardiService.start(carContext)

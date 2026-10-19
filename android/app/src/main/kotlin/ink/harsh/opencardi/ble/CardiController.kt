@@ -130,6 +130,14 @@ object CardiController {
 	 */
 	fun connect() {
 		val known = rememberedAddress ?: return
+		// A device remembered by an older build that matched on the generic
+		// FFF0 service may not be a kit at all. Forget it rather than drive it.
+		val cached = client?.cachedName(known)
+		if (cached != null && !isKitName(cached)) {
+			android.util.Log.w("CardiWire", "remembered $known ($cached) is not a kit — forgetting it")
+			forget()
+			return
+		}
 		if (_state.value.connection == Connection.CONNECTED ||
 			_state.value.connection == Connection.CONNECTING
 		) return

@@ -20,14 +20,18 @@ import ink.harsh.opencardi.protocol.Patterns
  */
 class PatternScreen(
 	carContext: CarContext,
+	// Named in the header so it's clear which zone the pattern goes to.
+	private val zoneLabel: String,
 	private val startIndex: Int = 0,
 ) : Screen(carContext) {
 
-	override fun onGetTemplate(): Template {
+	override fun onGetTemplate(): Template = guarded(carContext) { template() }
+
+	private fun template(): Template {
 		val limit = carLimit(carContext, LIST)
 		val current = CardiController.state.value.patternIndex
 
-		// The first page spends one slot on "Off".
+		// The first page spends one slot on "Solid colour".
 		val offSlot = if (startIndex == 0) 1 else 0
 		val page = Patterns.calm.drop(startIndex)
 		val slots = limit - offSlot
@@ -40,10 +44,11 @@ class PatternScreen(
 		if (offSlot == 1) {
 			list.addItem(
 				Row.Builder()
-					.setTitle("Off")
+					.setTitle("Solid colour")
 					.apply { if (current == null) addText("Selected") }
 					.setOnClickListener {
 						CardiController.clearPattern()
+						confirm(carContext, "Solid colour on $zoneLabel")
 						screenManager.pop()
 					}
 					.build()
@@ -57,6 +62,7 @@ class PatternScreen(
 					.apply { if (current == pattern.index) addText("Selected") }
 					.setOnClickListener {
 						CardiController.setPattern(pattern.index)
+						confirm(carContext, "${pattern.label} on $zoneLabel")
 						screenManager.pop()
 					}
 					.build()
@@ -71,7 +77,7 @@ class PatternScreen(
 					.addText("$rest more")
 					.setBrowsable(true)
 					.setOnClickListener {
-						screenManager.push(PatternScreen(carContext, startIndex + take))
+						screenManager.push(PatternScreen(carContext, zoneLabel, startIndex + take))
 					}
 					.build()
 			)
@@ -80,7 +86,7 @@ class PatternScreen(
 		return ListTemplate.Builder()
 			.setHeader(
 				Header.Builder()
-					.setTitle("Pattern")
+					.setTitle("Pattern · $zoneLabel")
 					.setStartHeaderAction(Action.BACK)
 					.build()
 			)
